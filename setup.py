@@ -10,7 +10,6 @@ setup(
     author = 'Jonathan Slenders, City Live nv',
     packages = find_packages('src'),
     package_dir = {'': 'src'},
-    install_requires = listify('requirements.pip'),
     classifiers = [
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
