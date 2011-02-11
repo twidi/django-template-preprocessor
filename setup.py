@@ -9,6 +9,8 @@ setup(
     long_description = open('README','r').read(),
     author = 'Jonathan Slenders, City Live nv',
     packages = find_packages('src'),
+    package_data = {'template_preprocessor': ['templates/*.html', 'templates/*/*.html', 'templates/*/*/*.html'],},
+    include_package_data=True,
     package_dir = {'': 'src'},
     classifiers = [
         'Development Status :: 4 - Beta',
