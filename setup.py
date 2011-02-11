@@ -6,7 +6,7 @@ setup(
     url = 'https://github.com/citylive/django-template-preprocessor',
     license = 'BSD',
     description = "Template preprocessor/compiler for Django",
-    long_description = open('README.rst','r').read(),
+    long_description = open('README','r').read(),
     author = 'Jonathan Slenders, City Live nv',
     packages = find_packages('src'),
     package_dir = {'': 'src'},
