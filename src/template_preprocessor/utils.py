@@ -1,3 +1,5 @@
+from django.utils import translation
+
 
 def language(lang):
     """
