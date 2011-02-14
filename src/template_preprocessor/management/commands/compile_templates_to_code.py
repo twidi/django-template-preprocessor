@@ -11,18 +11,23 @@ from django.core.management.base import BaseCommand
 from django.core.urlresolvers import reverse
 from django.template import TemplateDoesNotExist
 
-from template_preprocessor.core import compile
+from template_preprocessor.core import compile_to_parse_tree
+from template_preprocessor.render_engine.render import compile_tree
 from template_preprocessor.core.lexer import CompileException
 
 from template_preprocessor.utils import language, template_iterator, load_template_source
 
+WARNING="""
+            WARNING: experimental compiler, not ready for production!
+"""
 
 
 class Command(BaseCommand):
-    help = "Preprocess all the templates form all known applications."
+    help = "Compile all the templates to fast python code."
+
     option_list = BaseCommand.option_list + (
-        make_option('--language', action='append', dest='languages', help='Give the languages'),
         make_option('--all', action='store_true', dest='all_templates', help='Compile all templates (instead of only the changed)'),
+        make_option('--language', action='append', dest='languages', help='Give the languages'),
     )
 
 
@@ -30,9 +35,10 @@ class Command(BaseCommand):
         self._errors.append(text)
         print termcolor.colored(text, 'white', 'on_red')
 
-
     def handle(self, *args, **options):
         all_templates = options['all_templates']
+
+        print WARNING
 
         # Default verbosity
         self.verbosity = int(options.get('verbosity', 1))
@@ -42,20 +48,19 @@ class Command(BaseCommand):
         if options['languages'] is None:
             options['languages'] = languages
 
-
         self._errors = []
-        if languages.sort() != options['languages'].sort():
-            print termcolor.colored('Warning: all template languages are deleted while we won\'t generate them again.', 'white', 'on_red')
+
+        cache_dir = os.path.join(settings.TEMPLATE_CACHE_DIR, 'compiled_to_code')
 
         # Delete previously compiled templates
         # (This is to be sure that no template loaders were configured to
         # load files from this cache.)
         if all_templates:
-            for root, dirs, files in os.walk(settings.TEMPLATE_CACHE_DIR):
+            for root, dirs, files in os.walk(cache_dir):
                 for f in files:
                     path = os.path.join(root, f)
                     if self.verbosity >= 1:
-                        print ('Deleting old template: %s' % path)
+                        print ('Deleting old code: %s' % path)
                     os.remove(path)
 
         # Create compile queue
@@ -68,7 +73,7 @@ class Command(BaseCommand):
             # Now compile all templates to the cache directory
             for dir, t in template_iterator():
                 input_path = os.path.join(dir, t)
-                output_path = os.path.join(settings.TEMPLATE_CACHE_DIR, lang, t)
+                output_path = os.path.join(cache_dir, lang, t)
                 if (
                         all_templates or
                         not os.path.exists(output_path) or
@@ -97,11 +102,12 @@ class Command(BaseCommand):
             code = codecs.open(input_path, 'r', 'utf-8').read()
 
             # Compile
-            output = compile(code, loader=load_template_source, path=input_path)
+            output = compile_to_parse_tree(code, loader=load_template_source, path=input_path)
+            output2 = compile_tree(output)
 
             # Open output file
             self._create_dir(os.path.split(output_path)[0])
-            codecs.open(output_path, 'w', 'utf-8').write(output)
+            codecs.open(output_path, 'w', 'utf-8').write(output2)
 
         except CompileException, e:
             self.print_error(u'ERROR:  %s' % unicode(e))

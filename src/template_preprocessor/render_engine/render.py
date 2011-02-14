@@ -42,7 +42,7 @@
 # http://docs.python.org/reference/executionmodel.html
 
 
-from template_preprocessor.core.django_processor import DjangoTag, DjangoContent, DjangoVariable, DjangoPreprocessorConfigTag, DjangoTransTag, DjangoBlocktransTag, DjangoComment, DjangoMultilineComment, DjangoUrlTag, DjangoLoadTag, DjangoPackTag, DjangoRawOutput
+from template_preprocessor.core.django_processor import DjangoTag, DjangoContent, DjangoVariable, DjangoPreprocessorConfigTag, DjangoTransTag, DjangoBlocktransTag, DjangoComment, DjangoMultilineComment, DjangoUrlTag, DjangoLoadTag, DjangoCompressTag, DjangoRawOutput
 from template_preprocessor.core.html_processor import HtmlNode
 from django.utils.translation import ugettext as _
 
@@ -496,7 +496,7 @@ def compile_tree(tree):
                 # Create blocktrans frame
                 top().append_content(BlocktransFrame(n))
 
-            elif any([ isinstance(n, k) for k in (DjangoPreprocessorConfigTag, DjangoComment, DjangoMultilineComment, DjangoLoadTag, DjangoPackTag) ]):
+            elif any([ isinstance(n, k) for k in (DjangoPreprocessorConfigTag, DjangoComment, DjangoMultilineComment, DjangoLoadTag, DjangoCompressTag) ]):
                 pass
 
             elif any([ isinstance(n, k) for k in (DjangoContent, HtmlNode, DjangoRawOutput) ]):
