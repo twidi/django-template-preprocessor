@@ -1,0 +1,77 @@
+===========================================================
+Template Preprocessor Readme
+===========================================================
+
+Author: Jonathan Slenders, City Live nv
+
+Description:
+
+    Preprocessor for Django templates which compiles all files in a very
+    compact version. This does not only result in less HTTP traffic, but also
+    causes the template render engine of Django to have less work at runtime.
+    (A lot of template tags can be processed in advance.)
+
+
+
+Setup
+-----
+
+Add this to your settings.py:
+
+    >   # Define languages -> otherwise templates will be compiled in all possible languages
+    >   LANGUAGES = (
+    >        ('en', 'EN'),
+    >   )
+    >
+    >   # Define directories
+    >   MEDIA_ROOT = ROOT + 'media/'
+    >   MEDIA_URL = '/media/'
+    >   MEDIA_CACHE_DIR = MEDIA_ROOT + 'cache/'
+    >   MEDIA_CACHE_URL = MEDIA_URL + 'cache/'
+    >   TEMPLATE_CACHE_DIR = ROOT + 'templates/cache/'
+    >
+    >   # Wrap template loaders
+    >   if DEBUG:
+    >       TEMPLATE_LOADERS = (
+    >           #('template_preprocessor.template.loaders.ValidatorLoader',
+    >           ('template_preprocessor.template.loaders.RuntimeProcessedLoader',
+    >               TEMPLATE_LOADERS
+    >           ),
+    >       )
+    >   else:
+    >       TEMPLATE_LOADERS = (
+    >           ('template_preprocessor.template.loaders.PreprocessedLoader',
+    >               TEMPLATE_LOADERS
+    >           ),
+    >       )
+    >
+    >   # Applications
+    >   INSTALLED_APPS += ( 'template_preprocessor', )
+
+
+This will recompile every template during every page load at runtime, but it
+will use the preprocessed templates during production.
+
+
+You can finetune the behaviour of the preprocessor, by enabling or disabling
+specific options. Add the following to your settings.py
+
+    >   # Enabled modules of the template preprocessor
+    >   TEMPLATE_PREPROCESSOR_OPTIONS = [
+    >           'whitespace-compression',
+    >           'html',
+    >           'html-remove-empty-class-attributes',
+    >           'merge-internal-css',
+    >           'pack-external-javascript',
+    >           'pack-external-css',
+    >           'compile-javascript',
+    >           'compile-css',
+    >   ]
+
+
+Precompile templates
+--------------------
+
+Run this command on your shell
+
+    > ./manage.py compile_templates -v 2

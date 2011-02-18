@@ -510,7 +510,7 @@ __DJANGO_BLOCK_ELEMENTS = {
 class PreProcessSettings(object):
     def __init__(self, path=''):
         # Default settings
-        self.whitespace_compression = False
+        self.whitespace_compression = True
         self.preprocess_translations = True
         self.preprocess_urls = True
         self.preprocess_variables = True
@@ -525,8 +525,8 @@ class PreProcessSettings(object):
         self.is_html = True
 
         self.check_alt_and_title_attributes = False
-        self.compile_css = False
-        self.compile_javascript = False
+        self.compile_css = True
+        self.compile_javascript = True
         self.ensure_quotes_around_html_attributes = False # Not reliable for now...
         self.merge_internal_css = False
         self.merge_internal_javascript = False
@@ -537,7 +537,7 @@ class PreProcessSettings(object):
         self.validate_html = False
 
         # Load defaults form settings.py
-        for o in settings.TEMPLATE_PREPROCESSOR_OPTIONS:
+        for o in getattr(settings, 'TEMPLATE_PREPROCESSOR_OPTIONS', { }):
             self.change(o)
 
         # Disable all HTML extensions if template name does not end with .html
