@@ -27,6 +27,15 @@ def language(lang):
     return with_block()
 
 
+def _get_path_form_app(app):
+    m = __import__(app)
+    if '.' in app:
+        parts = app.split('.')
+        for p in parts[1:]:
+            m = getattr(m, p)
+    return m.__path__[0]
+
+
 def template_iterator():
     """
     Iterate through all templates of all installed apps.
@@ -39,21 +48,13 @@ def template_iterator():
                     if f.endswith('.html'):
                         yield os.path.relpath(os.path.join(root, f), directory)
 
-    def get_path_form_app(app):
-        m = __import__(app)
-        if '.' in app:
-            parts = app.split('.')
-            for p in parts[1:]:
-                m = getattr(m, p)
-        return m.__path__[0]
-
     for dir in settings.TEMPLATE_DIRS:
         for f in walk(dir):
             yield dir, f
 
     for app in settings.INSTALLED_APPS:
         if app not in EXCLUDED_APPS:
-            dir = os.path.join(get_path_form_app(app), 'templates')
+            dir = os.path.join(_get_path_form_app(app), 'templates')
             for f in walk(dir):
                 yield dir, f
 
@@ -67,7 +68,7 @@ def load_template_source(path):
             return codecs.open(p, 'r', 'utf-8').read()
 
     for app in settings.INSTALLED_APPS:
-        p = os.path.join(__import__(app).__path__[0], 'templates', path)
+        p = os.path.join(_get_path_form_app(app), 'templates', path)
         if os.path.exists(p):
             return codecs.open(p, 'r', 'utf-8').read()
 
