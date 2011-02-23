@@ -39,13 +39,21 @@ def template_iterator():
                     if f.endswith('.html'):
                         yield os.path.relpath(os.path.join(root, f), directory)
 
+    def get_path_form_app(app):
+        m = __import__(app)
+        if '.' in app:
+            parts = app.split('.')
+            for p in parts[1:]:
+                m = getattr(m, p)
+        return m.__path__[0]
+
     for dir in settings.TEMPLATE_DIRS:
         for f in walk(dir):
             yield dir, f
 
     for app in settings.INSTALLED_APPS:
         if app not in EXCLUDED_APPS:
-            dir = os.path.join(__import__(app).__path__[0], 'templates')
+            dir = os.path.join(get_path_form_app(app), 'templates')
             for f in walk(dir):
                 yield dir, f
 
