@@ -12,6 +12,7 @@ setup(
     package_data = {'template_preprocessor': ['templates/*.html', 'templates/*/*.html', 'templates/*/*/*.html'],},
     include_package_data=True,
     package_dir = {'': 'src'},
+    zip_safe=False, # Don't create egg files, Django cannot find templates in egg files.
     classifiers = [
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
