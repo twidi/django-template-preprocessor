@@ -60,13 +60,13 @@ __JS_STATES = {
     'double-quoted-string': State(
             State.Transition(r'"', (Record(), Pop(), Shift(), StopToken(), )),
             State.Transition(r'\\.', (Record(), Shift(), )),
-            State.Transition(r'[^"]+', (Record(), Shift(), )),
+            State.Transition(r'[^"\\]+', (Record(), Shift(), )),
             State.Transition(r'.|\s', (Error('Error in parser #2'),)),
             ),
     'single-quoted-string': State(
             State.Transition(r"'", (Record(), Pop(), Shift(), StopToken(), )),
             State.Transition(r'\\.', (Record(), Shift() )),
-            State.Transition(r"[^']+", (Record(), Shift(), )),
+            State.Transition(r"[^'\\]+", (Record(), Shift(), )),
             State.Transition(r'.|\s', (Error('Error in parser #3'),)),
             ),
 
