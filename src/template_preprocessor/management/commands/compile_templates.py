@@ -69,10 +69,21 @@ class Command(BaseCommand):
             for dir, t in template_iterator():
                 input_path = os.path.join(dir, t)
                 output_path = os.path.join(settings.TEMPLATE_CACHE_DIR, lang, t)
+
+                # Compile this template if:
                 if (
+                        # We are compiling *everything*
                         all_templates or
+
+                        # Compiled file does not exist
                         not os.path.exists(output_path) or
+
+                        # Compiled file has been marked for recompilation
+                        os.path.exists(output_path + '-c-recompile') or
+
+                        # Compiled file is outdated
                         os.path.getmtime(output_path) < os.path.getmtime(input_path)):
+
                     queue.add( (lang, input_path, output_path) )
 
         queue = list(queue)
@@ -91,20 +102,40 @@ class Command(BaseCommand):
         # Show all errors once again.
         print u'\n*** %i Files processed, %i compile errors ***' % (len(queue), len(self._errors))
 
-    def _compile_template(self, lang, input_path, output_path):
+    def _compile_template(self, lang, input_path, output_path, no_html=False):
         try:
             # Open input file
             code = codecs.open(input_path, 'r', 'utf-8').read()
 
             # Compile
-            output = compile(code, loader=load_template_source, path=input_path)
+            if no_html:
+                output = compile(code, loader=load_template_source, path=input_path, options=['no-html'])
+            else:
+                output = compile(code, loader=load_template_source, path=input_path)
 
             # Open output file
             self._create_dir(os.path.split(output_path)[0])
             codecs.open(output_path, 'w', 'utf-8').write(output)
 
+            # Delete -c-recompile file (mark for recompilation) if one such exist.
+            if os.path.exists(output_path + '-c-recompile'):
+                os.remove(output_path + '-c-recompile')
+
+            return True
+
         except CompileException, e:
             self.print_error(u'ERROR:  %s' % unicode(e))
+
+            # Try again without html
+            if not no_html:
+                print u'Trying again with option "no-html"... ',
+                if self._compile_template(lang, input_path, output_path, no_html=True):
+                    print 'Succeeded'
+                else:
+                    print 'Failed again'
+
+                # Create recompile mark
+                open(output_path + '-c-recompile', 'w').close()
 
         except TemplateDoesNotExist, e:
             if self.verbosity >= 2:

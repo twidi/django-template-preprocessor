@@ -44,7 +44,7 @@ def template_iterator():
     def walk(directory):
         for root, dirs, files in os.walk(directory):
             for f in files:
-                if not os.path.join(root, f).startswith(settings.TEMPLATE_CACHE_DIR):
+                if not os.path.normpath(os.path.join(root, f)).startswith(settings.TEMPLATE_CACHE_DIR):
                     if f.endswith('.html'):
                         yield os.path.relpath(os.path.join(root, f), directory)
 
