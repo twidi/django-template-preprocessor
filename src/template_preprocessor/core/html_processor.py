@@ -1055,35 +1055,38 @@ def _pack_external_css(tree):
                 if source.startswith(MEDIA_URL):
                     # Add to list
                     source = source[len(MEDIA_URL):].lstrip('/')
-                    css_in_pack.append(source)
+                    css_in_pack.append( { 'tag': tag, 'source': source } )
                     _check_external_file_existance(tag, source)
 
-        if css_in_pack:
-            # Create a hash for all the CSS files
+        # Group CSS only when they have the same 'media' attribute value
+        while css_in_pack:
+            # Place first css include in current pack
+            first_tag = css_in_pack[0]['tag']
+            media = first_tag.get_html_attribute_value_as_string('media')
+
+            css_in_current_pack = [ css_in_pack[0]['source'] ]
+            css_in_pack = css_in_pack[1:]
+
+            # Following css includes with same media attribute
+            while css_in_pack and css_in_pack[0]['tag'].get_html_attribute_value_as_string('media') == media:
+                # Remove this tag from the HTML tree (not needed anymore)
+                pack_tag.remove_child_nodes([ css_in_pack[0]['tag'] ])
+
+                # Remember source
+                css_in_current_pack.append(css_in_pack[0]['source'])
+                css_in_pack = css_in_pack[1:]
+
+            # Create a hash for all concecutive CSS files with the same media attribute
             # And remember in cache
-            css_in_pack = tuple(css_in_pack) # tuples are hashable
-            hash = md5(''.join(css_in_pack)).hexdigest()
+            css_in_current_pack = tuple(css_in_current_pack) # tuples are hashable
+            hash = md5(''.join(css_in_current_pack)).hexdigest()
 
             # Remember which media files were linked to this cache,
             # and compile the media files.
-            new_css_url = _compile_css_files(hash, css_in_pack)
+            new_css_url = _compile_css_files(hash, css_in_current_pack)
 
-            # Replace the first external css url by this one.
-            # Remove all other external css files
-            first = True
-            for tag in list(pack_tag.child_nodes_of_class([ HtmlTag ])):
-                # ! Note that we made a list of the child_nodes_of_class iterator,
-                #   this is required because we are removing childs from the list here.
-                if is_external_css_tag(tag):
-                    source = tag.get_html_attribute_value_as_string('href')
-                    if source.startswith(MEDIA_URL):
-                        if first:
-                            # Replace source
-                            tag.set_html_attribute('href', new_css_url)
-                            first = False
-                        else:
-                            pack_tag.remove_child_nodes([tag])
-
+            # Update URL for first external CSS node
+            first_tag.set_html_attribute('href', new_css_url)
 
 
 # ==================================[  HTML Parser ]================================
