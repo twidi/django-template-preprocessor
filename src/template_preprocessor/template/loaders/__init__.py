@@ -12,6 +12,7 @@ from django.utils.importlib import import_module
 from django.template import StringOrigin
 
 from template_preprocessor.core import compile
+from template_preprocessor.utils import get_options_for_path
 
 import os
 import codecs
@@ -104,7 +105,8 @@ class RuntimeProcessedLoader(_Base):
         template, origin = self.find_template(template_name, template_dirs)
 
         # Compile template (we shouldn't compile anything at runtime.)
-        template = compile(template, loader = lambda path: self.find_template(path)[0], path=template_name)
+        template = compile(template, loader = lambda path: self.find_template(path)[0], path=template_name,
+                        options=get_options_for_path(origin.name))
 
         # Turn into Template object
         template = get_template_from_string(template, origin, template_name)
@@ -146,7 +148,8 @@ class ValidatorLoader(_Base):
             import inspect
             if not any(map(lambda i:'render' == i[3], inspect.getouterframes(inspect.currentframe()))):
                 #print 'compiling %s' % template_name
-                compile(template, loader = lambda path: self.find_template(path)[0], path=template_name)
+                compile(template, loader = lambda path: self.find_template(path)[0], path=template_name,
+                            options=get_options_for_path(origin.name))
         except Exception, e:
             print '---'
             print 'Template: %s' % template_name

@@ -24,7 +24,7 @@ from hashlib import md5
 
 
 __HTML_BLOCK_LEVEL_ELEMENTS = ('html', 'head', 'body', 'meta', 'script', 'noscript', 'p', 'div', 'ul', 'ol', 'dl', 'dt', 'dd', 'li', 'table', 'td', 'tr', 'th', 'thead', 'tfoot', 'tbody', 'br', 'link', 'title', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'form', 'object', 'base', 'iframe', 'fieldset', 'code', 'blockquote', 'legend', 'pre', ) # TODO: complete
-__HTML_INLINE_LEVEL_ELEMENTS = ('span', 'a', 'b', 'i', 'em', 'strong', 'select', 'label', 'q', 'sub', 'sup', 'small', 'sub', 'sup', 'option', 'abbr', 'img', 'input', 'hr', 'param', 'button', 'caption', 'style', 'textarea', 'colgroup', 'col', 'samp' )
+__HTML_INLINE_LEVEL_ELEMENTS = ('span', 'a', 'b', 'i', 'em', 'del', 'ins', 'strong', 'select', 'label', 'q', 'sub', 'sup', 'small', 'sub', 'sup', 'option', 'abbr', 'img', 'input', 'hr', 'param', 'button', 'caption', 'style', 'textarea', 'colgroup', 'col', 'samp' )
 
     # TODO: 'img', 'object' 'button', 'td' and 'th' are inline-block
 

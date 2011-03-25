@@ -15,6 +15,7 @@ from template_preprocessor.core import compile
 from template_preprocessor.core.lexer import CompileException
 
 from template_preprocessor.utils import language, template_iterator, load_template_source
+from template_preprocessor.utils import get_options_for_path
 
 
 
@@ -112,9 +113,11 @@ class Command(BaseCommand):
 
             # Compile
             if no_html:
-                output = compile(code, loader=load_template_source, path=input_path, options=['no-html'])
+                output = compile(code, loader=load_template_source, path=input_path,
+                            options=get_options_for_path(input_path) + ['no-html'])
             else:
-                output = compile(code, loader=load_template_source, path=input_path)
+                output = compile(code, loader=load_template_source, path=input_path,
+                            options=get_options_for_path(input_path))
 
             # Open output file
             codecs.open(output_path, 'w', 'utf-8').write(output)

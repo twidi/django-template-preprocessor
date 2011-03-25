@@ -58,6 +58,7 @@ def template_iterator():
             for f in walk(dir):
                 yield dir, f
 
+
 def load_template_source(path):
     """
     Look in the template loaders for this template, return content.
@@ -73,3 +74,29 @@ def load_template_source(path):
             return codecs.open(p, 'r', 'utf-8').read()
 
     raise TemplateDoesNotExist, path
+
+
+
+def get_options_for_path(path):
+    """
+    return a list of default settings for this template.
+    (find app, and return settings for the matching app.)
+    """
+    for app in settings.INSTALLED_APPS:
+        dir = os.path.normpath(os.path.join(_get_path_form_app(app), 'templates'))
+        if os.path.normpath(path).startswith(dir):
+            return get_options_for_app(app)
+    return []
+
+
+def get_options_for_app(app):
+    """
+    return a list of default settings for this application.
+    (e.g. Some applications, like the django admin are not HTML compliant with
+    this validator.)
+    """
+    if app in ('django.contrib.admin', 'django.contrib.admindocs', 'debug_toolbar'):
+        return [ 'no-html' ]
+    else:
+        return []
+

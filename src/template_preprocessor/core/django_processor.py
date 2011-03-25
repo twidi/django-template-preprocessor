@@ -534,7 +534,7 @@ class PreProcessSettings(object):
         self.pack_external_javascript = False
         self.pack_external_css = False
         self.parse_all_html_tags = False
-        self.validate_html = False
+        self.validate_html = True
 
         # Load defaults form settings.py
         for o in getattr(settings, 'TEMPLATE_PREPROCESSOR_OPTIONS', { }):
@@ -545,7 +545,7 @@ class PreProcessSettings(object):
         if path and not path.endswith('.html'):
             self.is_html = False
 
-    def change(self, value, node=False):
+    def change(self, value, node=None):
         actions = {
             'whitespace-compression': ('whitespace_compression', True),
             'no-whitespace-compression': ('whitespace_compression', False),
@@ -562,6 +562,7 @@ class PreProcessSettings(object):
             'compile-javascript': ('compile_javascript', True),
             'parse-all-html-tags': ('parse_all_html_tags', True),
             'validate-html': ('validate_html', True),
+            'no-validate-html': ('validate_html', False),
         }
 
         if value in actions:
@@ -570,7 +571,7 @@ class PreProcessSettings(object):
             if node:
                 raise CompileException(node, 'No such template preprocessor option: %s' % value)
             else:
-                raise CompileException(None, 'No such template preprocessor option: %s (in settings.py)' % value)
+                raise CompileException('No such template preprocessor option: %s (in settings.py)' % value)
 
 
 def _get_preprocess_settings(tree, extra_options):
@@ -586,6 +587,7 @@ def _get_preprocess_settings(tree, extra_options):
 
     for o in extra_options or []:
         options.change(o)
+
 
     return options
 
