@@ -640,10 +640,14 @@ def _process_extends(tree, loader):
             base_tree_blocks = list(base_tree.child_nodes_of_class([ DjangoBlockTag ]))
             tree_blocks = list(tree.child_nodes_of_class([ DjangoBlockTag ]))
 
+            # Retreive list of block tags in the outer scope of the child template.
+            # These are the blocks which at least have to exist in the parent.
+            outer_tree_blocks = filter(lambda b: isinstance(b, DjangoBlockTag), tree.children)
+
             # For every {% block %} in the base tree
             for base_block in base_tree_blocks:
                 # Look for a block with the same name in the current tree
-                for block in tree_blocks:
+                for block in tree_blocks[:]:
                     if block.block_name == base_block.block_name:
                         # Replace {{ block.super }} variable by the parent's
                         # block node's children.
@@ -658,6 +662,15 @@ def _process_extends(tree, loader):
 
                         # Replace all nodes in the base tree block, with this nodes
                         base_block.children = block.children
+
+                        # Remove block from list
+                        if block in outer_tree_blocks:
+                            outer_tree_blocks.remove(block)
+
+            # We shouldn't have any blocks left (if so, they don't have a match in the parent)
+            if outer_tree_blocks:
+                raise CompileException(outer_tree_blocks[0],
+                        'Found {%% block %s %%} which has not been found in the parent' % outer_tree_blocks[0].block_name)
 
             # Move every {% load %} and {% ! ... %} to the base tree
             for l in tree.child_nodes_of_class([ DjangoLoadTag, DjangoPreprocessorConfigTag ]):

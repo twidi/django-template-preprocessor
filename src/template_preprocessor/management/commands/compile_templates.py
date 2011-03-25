@@ -107,6 +107,9 @@ class Command(BaseCommand):
             # Open input file
             code = codecs.open(input_path, 'r', 'utf-8').read()
 
+            # Create output directory
+            self._create_dir(os.path.split(output_path)[0])
+
             # Compile
             if no_html:
                 output = compile(code, loader=load_template_source, path=input_path, options=['no-html'])
@@ -114,7 +117,6 @@ class Command(BaseCommand):
                 output = compile(code, loader=load_template_source, path=input_path)
 
             # Open output file
-            self._create_dir(os.path.split(output_path)[0])
             codecs.open(output_path, 'w', 'utf-8').write(output)
 
             # Delete -c-recompile file (mark for recompilation) if one such exist.
