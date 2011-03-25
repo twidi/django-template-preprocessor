@@ -83,9 +83,12 @@ def get_options_for_path(path):
     (find app, and return settings for the matching app.)
     """
     for app in settings.INSTALLED_APPS:
-        dir = os.path.normpath(os.path.join(_get_path_form_app(app), 'templates'))
-        if os.path.normpath(path).startswith(dir):
+        dir = os.path.normpath(os.path.join(_get_path_form_app(app), 'templates')).lower()
+        if os.path.normpath(path).lower().startswith(dir):
             return get_options_for_app(app)
+
+        # NOTE: somehow, we get lowercase paths from the template origin in
+        # Windows, so convert both paths to lowercase before comparing.
     return []
 
 
