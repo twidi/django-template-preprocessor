@@ -2,7 +2,6 @@ from setuptools import setup, find_packages
 
 setup(
     name = "django-template-preprocessor",
-    version = "1.1.2",
     url = 'https://github.com/citylive/django-template-preprocessor',
     license = 'BSD',
     description = "Template preprocessor/compiler for Django",
