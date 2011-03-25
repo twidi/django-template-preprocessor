@@ -126,10 +126,11 @@ class Command(BaseCommand):
             return True
 
         except CompileException, e:
-            self.print_error(u'ERROR:  %s' % unicode(e))
-
             # Try again without html
             if not no_html:
+                # Print the error
+                self.print_error(u'ERROR:  %s' % unicode(e))
+
                 print u'Trying again with option "no-html"... ',
                 if self._compile_template(lang, input_path, output_path, no_html=True):
                     print 'Succeeded'
