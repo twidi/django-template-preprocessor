@@ -57,16 +57,33 @@ You can finetune the behaviour of the preprocessor, by enabling or disabling
 specific options. Add the following to your settings.py
 
     >   # Enabled modules of the template preprocessor
-    >   TEMPLATE_PREPROCESSOR_OPTIONS = [
-    >           'whitespace-compression',
-    >           'html',
-    >           'html-remove-empty-class-attributes',
-    >           'merge-internal-css',
-    >           'pack-external-javascript',
-    >           'pack-external-css',
-    >           'compile-javascript',
-    >           'compile-css',
-    >   ]
+
+    >   TEMPLATE_PREPROCESSOR_OPTIONS = {
+    >           # Default settings
+    >           '*', ('html', 'whitespace-compression', ),
+    >
+    >           # Override for specific applications
+    >           ('django.contrib.admin', 'django.contrib.admindocs', 'debug_toolbar'): ('no-html',),
+    >   }
+
+    The available options are:
+
+    - 'whitespace-compression'
+    - 'no-whitespace-compression'
+    - 'merge-internal-javascript'
+    - 'merge-internal-css'
+    - 'html'
+    - 'no-html'
+    - 'html-remove-empty-class-attributes'
+    - 'html-check-alt-and-title-attributes'
+    - 'pack-external-javascript'
+    - 'pack-external-css'
+    - 'compile-css'
+    - 'compile-javascript'
+    - 'parse-all-html-tags'
+    - 'validate-html'
+    - 'no-validate-html'
+
 
 
 Precompile templates
@@ -75,3 +92,10 @@ Precompile templates
 Run this command on your shell
 
     > ./manage.py compile_templates -v 2
+
+
+Or if you want to recompile *all* templates. (This is required when base
+templates change, because the preprocessor does not yet trace template
+dependecies when compiling only the changed templates.)
+
+    > ./manage.py compile_templates -v 2 --all

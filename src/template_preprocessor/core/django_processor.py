@@ -536,15 +536,6 @@ class PreProcessSettings(object):
         self.parse_all_html_tags = False
         self.validate_html = True
 
-        # Load defaults form settings.py
-        for o in getattr(settings, 'TEMPLATE_PREPROCESSOR_OPTIONS', { }):
-            self.change(o)
-
-        # Disable all HTML extensions if template name does not end with .html
-        # (Can still be overriden in the templates.)
-        if path and not path.endswith('.html'):
-            self.is_html = False
-
     def change(self, value, node=None):
         actions = {
             'whitespace-compression': ('whitespace_compression', True),

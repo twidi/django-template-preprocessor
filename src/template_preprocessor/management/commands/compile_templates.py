@@ -105,11 +105,14 @@ class Command(BaseCommand):
 
     def _compile_template(self, lang, input_path, output_path, no_html=False):
         try:
-            # Open input file
-            code = codecs.open(input_path, 'r', 'utf-8').read()
-
             # Create output directory
             self._create_dir(os.path.split(output_path)[0])
+
+            try:
+                # Open input file
+                code = codecs.open(input_path, 'r', 'utf-8').read()
+            except UnicodeDecodeError, e:
+                raise CompileException(0, 0, input_path, str(e))
 
             # Compile
             if no_html:

@@ -17,10 +17,11 @@
 
 # Some tricks we are going to use:
 # 1. Compiled code will use local variables where possible. Following translations will be made:
-#           {{ a }}   ->    yield a
-#           {{ a.b }}   ->    yield a.b
-#           {{ a.0.c }}   ->    yield a[0].c
-#           {{ a.get_profile.c }}   ->    yield a.get_profile.c  # proxy of get_profile will call itself when resolving c.
+#         {{ a }}   ->    a
+#         {{ a.b }}   ->    a.b
+#         {{ a.0.c }}   ->    a[0].c
+#         {{ a.get_profile.c }}   ->  a.get_profile.c  # proxy of get_profile will call itself when resolving c.
+#
 #    Accessing local variables should be extremely fast in python, if a
 #    variable does not exist in the locals(), python will automatically look
 #    into the globals. But if we run this code through an eval() call, it is
@@ -35,7 +36,7 @@
 #    restore: sys.stdout=sys.__stdout__
 #    -> UPDATE: it's difficult to replace stdout. it would cause difficult template
 #    tag implementations, when using tags like {% filter escape %}i[Madi, it would cause
-#    several levels of wrapped-stdouts. -> maybe better to keep using yield.
+#    several levels of wrapped-stdouts. -> now using a custom _write function.
 
 
 # Very interesting documentation:
