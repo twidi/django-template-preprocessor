@@ -14,7 +14,7 @@ This parser will call the html/css/js parser if required.
 
 from django.conf import settings
 from django.template import TemplateDoesNotExist
-from django.utils.translation import ugettext as _
+from django.utils.translation import ugettext as _, ungettext
 from django.core.urlresolvers import NoReverseMatch
 from django.core.urlresolvers import reverse
 
@@ -286,7 +286,7 @@ class DjangoUrlTag(DjangoTag):
 
 class DjangoTransTag(Token):
     """
-    {% include varname_or_template %}
+    {% trans "text" %}
     """
     def process_params(self, params):
         self.__string_is_variable = False
@@ -327,7 +327,7 @@ class DjangoBlocktransTag(Token):
     def is_variable(self):
         # Consider this a dynamic string (which shouldn't be translated at compile time)
         # if it has variable nodes inside. Same for {% plural %} inside the blocktrans.
-        return len(list(self.child_nodes_of_class([DjangoVariable, DjangoTag]))) > 0
+        return len(list(self.child_nodes_of_class([DjangoVariable, DjangoPluralTag]))) > 0
 
     @property
     def string(self):
@@ -342,6 +342,18 @@ class DjangoBlocktransTag(Token):
         handler(u'%}')
         Token.output(self, handler)
         handler(u'{%endblocktrans%}')
+
+
+class DjangoPluralTag(Token):
+    """
+    {% plural %} tag. should only appear inside {% blocktrans %} for separating
+    the singular and plural form.
+    """
+    def process_params(self, params):
+        pass
+
+    def output(self, handler):
+        handler(u'{%plural%}')
 
 
 class DjangoLoadTag(Token):
@@ -461,6 +473,7 @@ def _add_parser_extensions(tree):
 _DJANGO_INLINE_ELEMENTS = {
     'extends': DjangoExtendsTag,
     'trans': DjangoTransTag,
+    'plural': DjangoPluralTag,
     'include': DjangoIncludeTag,
     'url': DjangoUrlTag,
     'load': DjangoLoadTag,
@@ -579,7 +592,6 @@ def _get_preprocess_settings(tree, extra_options):
     for o in extra_options or []:
         options.change(o)
 
-
     return options
 
 
@@ -662,6 +674,7 @@ def _process_extends(tree, loader):
 
             # We shouldn't have any blocks left (if so, they don't have a match in the parent)
             if outer_tree_blocks:
+                # TODO: make this error optional, or turn into a warning.
                 raise CompileException(outer_tree_blocks[0],
                         'Found {%% block %s %%} which has not been found in the parent' % outer_tree_blocks[0].block_name)
 
@@ -828,10 +841,72 @@ def _preprocess_trans_tags(tree):
             self.children = [ translated_text ]
 
     for trans in tree.child_nodes_of_class([ DjangoTransTag, DjangoBlocktransTag ]):
-        if not trans.is_variable:
-            s = _(trans.string)
+        # Process {% blocktrans %}
+        if isinstance(trans, DjangoBlocktransTag):
+            convert_var = lambda v: '%%(%s)s' % v
+
+            # Build translatable string
+            plural = False # get true when we find a plural translation
+            string = []
+            variables = []
+            plural_string = []
+            plural_variables = []
+
+            for n in trans.children:
+                if isinstance(n, DjangoPluralTag):
+                    if not (len(trans.params) and trans.params[0].output_as_string() == 'count'):
+                        raise CompileException(trans, '{% plural %} tags can only appear inside {% blocktrans COUNT ... %}')
+                    plural = True
+                elif isinstance(n, DjangoVariable):
+                    (plural_string if plural else string).append(convert_var(n.varname))
+                    (plural_variables if plural else variables).append(n.varname)
+                elif isinstance(n, DjangoContent):
+                    (plural_string if plural else string).append(n.output_as_string())
+                else:
+                    raise CompileException(n, 'Unexpected token in {% blocktrans %}: ' + n.output_as_string())
+
+            # Translate strings
+            string = _(u''.join(string))
+            plural_string = ungettext('dummy singular', ''.join(plural_string), 2)
+
+            # Replace variables in translated strings
+            for v in set(variables):
+                if convert_var(v) in string:
+                    string = string.replace(convert_var(v), '{{%s}}' % v)
+                else:
+                    raise CompileException(trans, 'Could not find variable "%s" in {%% blocktrans %%} after translating.' % v)
+
+            for v in set(plural_variables):
+                if convert_var(v) in plural_string:
+                    plural_string = plural_string.replace(convert_var(v), '{{%s}}' % v)
+                else:
+                    raise CompileException(trans, 'Could not find variable "%s" in {%% blocktrans %%} after translating.' % v)
+
+            # Wrap in {% if test %} for plural checking and in {% with test for passing parameters %}
+            if plural:
+                # {% blocktrans count /expression/ as /variable/ and ... %}
+                output = (
+                    '{%with ' + ' '.join(map(lambda t: t.output_as_string(), trans.params[1:])) + '%}' +
+                    '{%if ' + trans.params[3].output_as_string() + ' > 1%}' + plural_string + '{%else%}' + string + '{%endif%}' +
+                    '{%endwith%}')
+            else:
+                if len(trans.params):
+                    # {% blocktrans with /expression/ as /variable/ and ... %}
+                    output = '{%' + ' '.join(map(lambda t: t.output_as_string(), trans.params)) + '%}' + string + '{%endwith%}'
+                else:
+                    # {% blocktrans %}
+                    output = string
+
+            # Replace {% blocktrans %} by its translated output.
             trans.__class__ = DjangoTranslated
-            trans.init(s)
+            trans.init(output)
+
+        # Process {% trans "..." %}
+        else:
+            if not trans.is_variable:
+                output = _(trans.string)
+                trans.__class__ = DjangoTranslated
+                trans.init(output)
 
 
 def _preprocess_ifdebug(tree):
