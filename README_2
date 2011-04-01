@@ -1,0 +1,116 @@
+
+===========================================================
+Template Preprocessor Readme
+===========================================================
+
+Author: Jonathan Slenders, City Live nv
+
+
+    Some more technical information...
+
+
+
+What does it do?
+----------------
+
+Parse template, extract useful information, drop the rest and compile.
+
+What can be preprocess?
+- URLs when they don't take any parameters.
+- {% trans %} and {% transblock %}
+- {% now "Y" %}
+
+    (Some of our custom template tags.)
+- {% callmacro %},
+- {% tabpage %}, {% tabs %} and {% tabcontent %}
+- {% google_analytics ... %}
+
+What can be compressed?
+- Remove whitespace:
+    * between html tags (Not in <pre> and <textarea>, for the rest: keep always
+      at least one space, except around block-level html tags)
+    * between html attributes
+    * in Javascript
+    * in css
+- Remove empty attributes if allowed: like class=""
+- Comments in Javascript code. ( // and /*...*/ )
+- Comments in CSS code. ( /* ... */ )
+- Merge all CSS into the first <style> node.
+- Remove {% compress %} (compress shouldn't be at runtime)
+
+Compile:
+- Django template inheritance:
+    - merge templates with the parent from which it extends. (If they're
+      merged, we don't need {% block %} tags anymore....)
+    - Include {% include %} blocks.
+    - Fill in {{ block.super }} by the parent block's content.
+    - Merge all {% load %} statements in one.
+- Javascript code (rename variables to be as short as possible, remove comments
+  and whitespace where it's allowed.)
+
+
+Integration with Django:
+- As a template loader.
+- Preprocess once, return preprocessed template as string or Template object.
+
+
+The difficult part here is that templates consist of several languages,
+processed in following order:
+- Django Template Tags
+- HTML/XHTML tags
+- Embedded Javascript & CSS code.
+And Django is not really aware of which code is actually HTML and which is not.
+
+So, we need a parser to parse the templates in the same order as in which they
+are processed. But we can't preprocess all Django Tags without having a
+{context}, so we have to parse all other languages inside a parse tree of
+django code.
+
+
+
+How the parser works
+--------------------
+
+1. Parsing Django template tags:
+   - lexing & parsing of the source code returns parse tree consisting of
+     DjangoContent (which is either html, plain text or anything else, django
+     is not aware of it) and DjangoTemplateTags.
+
+
+2. If HTML parsing is enabled.
+    - For every content node in the previous parse tree, parse it as if it is
+      HTML content. The result is a new parse tree containing, where the
+      DjangoContent nodes are replaced by HtmlTags and HtmlAttributes.
+      (and a HtmlAttributes or -Tag may contain a DjangoTag again, and so on....)
+
+        hard example, but still supported:
+            <span class="{% if test %}selected"> .... </span>
+
+
+3. If JS parsing is enabled.
+    - For all HtmlTag elements in the tree, find those with 'script' as name,
+      and parse it's content again with a Javascript lexer/parser.
+
+      again, nesting lanugages is still possible
+
+        <script type="text/javascript">// <[!CDATA[
+            alert('{% url ... %}'); // ]]>
+        </script>
+
+4. If CSS parsing is enabled:
+    - similar to JS parsing.
+
+
+5. Compile Javascript:
+    - Create symbol table for every scope. (scope is surrounded by curly brackets.)
+    - Rename variables in private scopes to be as short as possible.
+
+
+
+
+
+
+
+
+
+

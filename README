@@ -12,6 +12,22 @@ Description:
     (A lot of template tags can be processed in advance.)
 
 
+    Why?
+    - Templates contain a lot of meaningless information causing more bandwidth
+      than required.
+    - A lot of information in templates which appears to be dynamic is actually
+      static and only needs to be calculated once instead of for every single
+      request.
+
+
+How much faster exactly?
+------------------------
+
+Some of our test show page loading improvements op to 400% compared to the
+default Django loader, and up to 200% compared to the cached loader in Django
+1.2. (Although, it may vary between templates.)
+
+
 
 Setup
 -----
@@ -86,6 +102,16 @@ specific options. Add the following to your settings.py
 
 
 
+Configuration at runtime
+------------------------
+
+    Following template tag is an example of how to alter the preprocessor
+    behaviour for a specific template.
+
+    {% load template_preprocessor %}{% ! no-html %}
+
+
+
 Precompile templates
 --------------------
 
@@ -99,3 +125,52 @@ templates change, because the preprocessor does not yet trace template
 dependecies when compiling only the changed templates.)
 
     > ./manage.py compile_templates -v 2 --all
+
+
+
+
+Additional recommendations
+--------------------------
+
+* Use CDATA for javascript. (will avoid accidently Html tags in script.)
+    <script type="text/javascript">// <![CDATA[ 
+        ...alert('<div>');
+        // ]]>
+    </script>
+
+* Prefer javascript comments in JS code above Django comments, and use CSS
+  comments in CSS code. (cleaner, and will be removed anyway.)
+
+* _Most_ important: _always_ open and close HTML tags, javascript braces, etc..
+  in the same scope. Instead of:
+
+            {% if test %}
+                <a ...
+            {% else test %}
+                <a ...
+            {% endif %}
+                ...
+            > link </a>
+  do:
+
+            <a
+            {% if test %}
+                 ...
+            {% else test %}
+                 ...
+            {% endif %}
+                ...
+            > link </a>
+
+  See? Opening bracket is now in the same text node as the closing bracket.
+  This is important for the parser to know that they are a pair, because the
+  HTML parser won't or can't be aware of how the Django Template tags are
+  rendered. What if the render() method of the {%if%}-node would return an
+  empty string, then there's no pair to be found in the first example.
+
+
+
+More information?
+-----------------
+
+Read README_2 for more technical information.
