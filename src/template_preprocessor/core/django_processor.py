@@ -1005,7 +1005,8 @@ def parse(source_code, path, loader, main_template=False, options=None):
             from django.contrib.sites.models import Site
             _preprocess_variables(tree,
                         {
-                            'MEDIA_URL': settings.MEDIA_URL,
+                            'MEDIA_URL': getattr(settings, 'MEDIA_URL', ''),
+                            'STATIC_URL': getattr(settings, 'STATIC_URL', ''),
                             'SITE_DOMAIN': Site.objects.get_current().domain,
                             'SITE_NAME': Site.objects.get_current().name,
                             'SITE_URL': 'http://%s' % Site.objects.get_current().domain,
