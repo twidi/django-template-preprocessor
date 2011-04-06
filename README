@@ -19,6 +19,12 @@ Description:
       static and only needs to be calculated once instead of for every single
       request.
 
+Issues?
+
+    Please report them if you find one!
+    https://github.com/citylive/django-template-preprocessor/issues
+
+
 
 How much faster exactly?
 ------------------------
