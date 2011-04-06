@@ -168,7 +168,7 @@ __HTML_STATES = {
 
     'attribute-string': State( # Double quoted
                     # NOTE: We could also use the regex r'"[^"]*"', but that won't work
-                    #       We need a separate state for the strings, because the sting itself could
+                    #       We need a separate state for the strings, because the string itself could
                     #       contain a django tag, and it works this way in lexer.
             State.Transition(r"'", (Record(), Shift(), Pop(), Pop(), StopToken(), StopToken(), )),
             State.Transition(r'&', (StartToken('html-entity'), Record(), Shift(), Push('entity'), )),
@@ -907,11 +907,41 @@ MEDIA_ROOT = settings.MEDIA_ROOT
 MEDIA_URL = settings.MEDIA_URL
 MEDIA_CACHE_DIR = settings.MEDIA_CACHE_DIR
 MEDIA_CACHE_URL = settings.MEDIA_CACHE_URL
+STATIC_URL = getattr(settings, 'STATIC_URL', '')
 
 
 def _create_directory_if_not_exists(directory):
     if not os.path.exists(directory):
         os.mkdir(directory)
+
+
+def _get_media_source_from_url(url):
+    """
+    For a given media/static URL, return the matching full path in the media/static directory
+    """
+    if MEDIA_URL and url.startswith(MEDIA_URL):
+        return os.path.join(MEDIA_ROOT, url[len(MEDIA_URL):].lstrip('/'))
+
+    elif STATIC_URL and url.startswith(STATIC_URL):
+        from django.contrib.staticfiles.finders import find
+        path = url[len(STATIC_URL):].lstrip('/')
+        return find(path)
+
+
+def _check_external_file_existance(node, url):
+    """
+    Check whether we have a matching file in our media/static directory for this URL.
+    Raise exception if we don't.
+    """
+    complete_path = _get_media_source_from_url(url)
+
+    if not complete_path or not os.path.exists(complete_path):
+        if MEDIA_URL and url.startswith(MEDIA_URL):
+            raise CompileException(node, 'Missing external media file (%s)' % url)
+
+        elif STATIC_URL and url.startswith(STATIC_URL):
+            raise CompileException(node, 'Missing external static file (%s)' % url)
+
 
 def _compile_js_files(hash, media_files):
     from template_preprocessor.core.js_processor import compile_javascript_string
@@ -923,7 +953,7 @@ def _compile_js_files(hash, media_files):
         # Compile script
             # 1. concatenate and compile all scripts
         source = u'\n'.join([
-                    compile_javascript_string(codecs.open(os.path.join(MEDIA_ROOT, p), 'r', 'utf-8').read(), p)
+                    compile_javascript_string(codecs.open(_get_media_source_from_url(p), 'r', 'utf-8').read(), p)
                     for p in media_files ])
 
             # 2. Store in media dir
@@ -948,7 +978,7 @@ def _compile_css_files(hash, media_files):
             # 1. concatenate and compile all css files
         source = u'\n'.join([
                     compile_css_string(
-                                codecs.open(os.path.join(MEDIA_ROOT, p), 'r', 'utf-8').read(),
+                                codecs.open(_get_media_source_from_url(p), 'r', 'utf-8').read(),
                                 os.path.join(MEDIA_ROOT, p),
                                 url=os.path.join(MEDIA_URL, p))
                     for p in media_files ])
@@ -964,11 +994,6 @@ def _compile_css_files(hash, media_files):
     return os.path.join(MEDIA_CACHE_URL, compiled_path)
 
 
-def _check_external_file_existance(node, path):
-    complete_path = os.path.join(MEDIA_ROOT, path)
-    if not os.path.exists(complete_path):
-        raise CompileException(node, 'Missing external media file (%s)' % complete_path)
-
 
 def _merge_internal_javascript(tree):
     """
@@ -980,7 +1005,7 @@ def _merge_internal_javascript(tree):
 
 def _merge_internal_css(tree):
     """
-    Group all internal css code in the first javascript block.
+    Group all internal CSS code in the first CSS block.
     """
     _merge_nodes_of_type(tree, HtmlStyleNode, dont_enter=[HtmlConditionalComment])
 
@@ -998,9 +1023,8 @@ def _pack_external_javascript(tree):
         for script in pack_tag.child_nodes_of_class([ HtmlScriptNode ]):
             if script.is_external:
                 source = script.script_source
-                if source.startswith(MEDIA_URL):
+                if (MEDIA_URL and source.startswith(MEDIA_URL)) or (STATIC_URL and source.startswith(STATIC_URL)):
                     # Add to list
-                    source = source[len(MEDIA_URL):].lstrip('/')
                     scripts_in_pack.append(source)
                     _check_external_file_existance(script, source)
 
@@ -1052,9 +1076,8 @@ def _pack_external_css(tree):
         for tag in pack_tag.child_nodes_of_class([ HtmlTag ]):
             if is_external_css_tag(tag):
                 source = tag.get_html_attribute_value_as_string('href')
-                if source.startswith(MEDIA_URL):
+                if (MEDIA_URL and source.startswith(MEDIA_URL)) or (STATIC_URL and source.startswith(STATIC_URL)):
                     # Add to list
-                    source = source[len(MEDIA_URL):].lstrip('/')
                     css_in_pack.append( { 'tag': tag, 'source': source } )
                     _check_external_file_existance(tag, source)
 
