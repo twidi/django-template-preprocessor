@@ -69,7 +69,7 @@ class Command(BaseCommand):
             # Now compile all templates to the cache directory
             for dir, t in template_iterator():
                 input_path = os.path.join(dir, t)
-                output_path = os.path.join(settings.TEMPLATE_CACHE_DIR, lang, t)
+                output_path = self._make_output_path(lang, t)
 
                 # Compile this template if:
                 if (
@@ -85,7 +85,7 @@ class Command(BaseCommand):
                         # Compiled file is outdated
                         os.path.getmtime(output_path) < os.path.getmtime(input_path)):
 
-                    queue.add( (lang, input_path, output_path) )
+                    queue.add( (lang, t, input_path, output_path) )
 
         queue = list(queue)
         queue.sort()
@@ -103,7 +103,34 @@ class Command(BaseCommand):
         # Show all errors once again.
         print u'\n*** %i Files processed, %i compile errors ***' % (len(queue), len(self._errors))
 
-    def _compile_template(self, lang, input_path, output_path, no_html=False):
+
+    def _make_output_path(self, language, template):
+        return os.path.join(settings.TEMPLATE_CACHE_DIR, language, template)
+
+
+    def _save_template_dependencies(self, lang, template, dependency_list):
+        """
+        Store template dependencies into meta files.  (So that we now which
+        templates need to be recompiled when one of the others has been
+        changed.)
+        """
+        # Reverse dependencies
+        for t in dependency_list:
+            output_path = self._make_output_path(lang, t) + '-c-used-by'
+            self._create_dir(os.path.split(output_path)[0])
+
+            # Append current template to this list if it doesn't appear yet
+            deps = open(output_path, 'r').read().split('\n') if os.path.exists(output_path) else []
+
+            if not template in deps:
+                open(output_path, 'a').write(template + '\n')
+
+        # Dependencies
+        output_path = self._make_output_path(lang, template) + '-depends-on'
+        open(output_path, 'w').write('\n'.join(dependency_list) + '\n')
+
+
+    def _compile_template(self, lang, template, input_path, output_path, no_html=False):
         try:
             # Create output directory
             self._create_dir(os.path.split(output_path)[0])
@@ -122,6 +149,9 @@ class Command(BaseCommand):
                 output, context = compile(code, path=input_path, loader=load_template_source,
                             options=get_options_for_path(input_path))
 
+            # store dependencies
+            self._save_template_dependencies(lang, template, context.template_dependencies)
+
             # Open output file
             codecs.open(output_path, 'w', 'utf-8').write(output)
 
@@ -138,7 +168,7 @@ class Command(BaseCommand):
                 self.print_error(u'ERROR:  %s' % unicode(e))
 
                 print u'Trying again with option "no-html"... ',
-                if self._compile_template(lang, input_path, output_path, no_html=True):
+                if self._compile_template(lang, template, input_path, output_path, no_html=True):
                     print 'Succeeded'
                 else:
                     print 'Failed again'
