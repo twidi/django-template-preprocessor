@@ -537,16 +537,14 @@ class PreProcessSettings(object):
         # HTML processor settings
         self.is_html = True
 
-        self.check_alt_and_title_attributes = False
         self.compile_css = True
         self.compile_javascript = True
         self.ensure_quotes_around_html_attributes = False # Not reliable for now...
         self.merge_internal_css = False
-        self.merge_internal_javascript = False
+        self.merge_internal_javascript = False # Not always recommended...
         self.remove_empty_class_attributes = False
         self.pack_external_javascript = False
         self.pack_external_css = False
-        self.parse_all_html_tags = False
         self.validate_html = True
 
     def change(self, value, node=None):
@@ -559,12 +557,10 @@ class PreProcessSettings(object):
             'no-html': ('is_html', False), # Disable all HTML specific options
             'no-macro-preprocessing': ('preprocess_macros', False),
             'html-remove-empty-class-attributes': ('remove_empty_class_attributes', True),
-            'html-check-alt-and-title-attributes': ('check_alt_and_title_attributes', True),
             'pack-external-javascript': ('pack_external_javascript', True),
             'pack-external-css': ('pack_external_css', True),
             'compile-css': ('compile_css', True),
             'compile-javascript': ('compile_javascript', True),
-            'parse-all-html-tags': ('parse_all_html_tags', True),
             'validate-html': ('validate_html', True),
             'no-validate-html': ('validate_html', False),
         }

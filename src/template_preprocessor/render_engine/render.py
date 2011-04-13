@@ -1,5 +1,10 @@
 # Author: Jonathan Slenders, City Live
 
+#
+#  !!!! THIS IS AN *EXPERIMENTAL* COMPILED RENDER ENGINE FOR DJANGO TEMPLATES
+#  !!!!      -- NOT READY FOR PRODUCTION --
+#
+
 
 # Only some ideas and pseudo code for implementing a faster template rendering
 # engine. The idea is to totally replace Django's engine, by writing a new

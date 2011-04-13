@@ -649,31 +649,6 @@ def _remove_whitespace_around_html_block_level_tags(tree):
             _remove_whitespace_around_html_block_level_tags(c)
 
 
-def _fill_in_alt_and_title_attributes(tree):
-    """
-    For every image, insert alt and title attributes if they are missing.
-    """
-    for tag in tree.child_nodes_of_class([ HtmlTag ]):
-        if tag.html_tagname == 'img':
-            attributes = tag.html_attributes
-
-            alt = attributes.get('alt') or attributes.get('title') or None
-            has_alt = bool(alt) and not alt.output_as_string() in ('', '""', "''")
-
-            if has_alt:
-                alt = deepcopy(alt)
-            else:
-                alt = HtmlTagAttributeValue();
-                alt.init_extension()
-                alt.children = [ '""' ]
-
-            if not 'alt' in attributes:
-                tag.add_attribute('alt', alt)
-
-            if has_alt and not 'title' in attributes:
-                tag.add_attribute('title', alt)
-
-
 def _compress_whitespace(tree):
     # Don't compress in the following tags
     dont_enter = [ HtmlScriptNode, HtmlStyleNode, HtmlPreNode, HtmlTextareaNode ]
@@ -1196,10 +1171,6 @@ def _process_html_tree(tree, options):
         _compress_whitespace(tree)
         _remove_whitespace_around_html_block_level_tags(tree)
 
-    # Ensure alt in <img alt="..." />
-    if options.check_alt_and_title_attributes:
-        _fill_in_alt_and_title_attributes(tree)
-
     # Need to be done before JS or CSS compiling.
     _merge_content_nodes(tree)
 
@@ -1230,7 +1201,7 @@ def _process_html_tree(tree, options):
         '''
         for attr in tree.child_nodes_of_class([ HtmlTagAttribute ]):
             if attr.attribute_name == 'style':
-                compile_css(attr.attribute_value)
+                att.attribute_value = compile_css(attr.attribute_value)
         '''
 
 
