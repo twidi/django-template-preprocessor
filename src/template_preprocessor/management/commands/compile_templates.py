@@ -116,10 +116,10 @@ class Command(BaseCommand):
 
             # Compile
             if no_html:
-                output = compile(code, loader=load_template_source, path=input_path,
+                output, context = compile(code, path=input_path, loader=load_template_source,
                             options=get_options_for_path(input_path) + ['no-html'])
             else:
-                output = compile(code, loader=load_template_source, path=input_path,
+                output, context = compile(code, path=input_path, loader=load_template_source,
                             options=get_options_for_path(input_path))
 
             # Open output file

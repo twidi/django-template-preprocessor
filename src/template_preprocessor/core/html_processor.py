@@ -1101,24 +1101,26 @@ def compile_html_string(html_string, path=''):
     # Tokenize
     tokenize(tree, __HTML_STATES, [Token] )
 
-    from template_preprocessor.core.django_processor import PreProcessSettings
-    options = PreProcessSettings()
-    _process_html_tree(tree, options)
+    from template_preprocessor.core.context import Context
+    context = Context(path)
+    _process_html_tree(tree, context)
 
     # Output
     return tree.output_as_string()
 
 
-def compile_html(tree, options):
+def compile_html(tree, context):
     """
     Compile the html in content nodes
     """
     # Parse HTML code in parse tree (Note that we don't enter DjangoRawTag)
     tokenize(tree, __HTML_STATES, [DjangoContent], [DjangoContainer ])
-    _process_html_tree(tree, options)
+    _process_html_tree(tree, context)
 
 
-def _process_html_tree(tree, options):
+def _process_html_tree(tree, context):
+    options = context.options
+
     # Add HTML parser extensions
     _add_html_parser_extensions(tree)
 

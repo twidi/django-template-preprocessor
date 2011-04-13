@@ -76,7 +76,7 @@ class PreprocessedLoader(_Base):
                 template, origin = self.find_template(template_name, template_dirs)
 
                 # Compile template (we shouldn't compile anything at runtime.)
-                #template = compile(template, loader = lambda path: self.find_template(path)[0], path=template_name)
+                #template, context = compile(template, loader = lambda path: self.find_template(path)[0], path=template_name)
 
             # Turn into Template object
             template = get_template_from_string(template, origin, template_name)
@@ -105,7 +105,7 @@ class RuntimeProcessedLoader(_Base):
         template, origin = self.find_template(template_name, template_dirs)
 
         # Compile template (we shouldn't compile anything at runtime.)
-        template = compile(template, loader = lambda path: self.find_template(path)[0], path=template_name,
+        template, context = compile(template, path=template_name, loader = lambda path: self.find_template(path)[0],
                         options=get_options_for_path(origin.name))
 
         # Turn into Template object
@@ -113,10 +113,6 @@ class RuntimeProcessedLoader(_Base):
 
         # Return result
         return template, None
-
-    def reset(self):
-        "Empty the template cache."
-        self.template_cache.clear()
 
 
 class ValidatorLoader(_Base):
@@ -133,7 +129,7 @@ class ValidatorLoader(_Base):
     def load_template(self, template_name, template_dirs=None):
         # IMPORTANT NOTE:  We load the template, using the original loaders.
         #                  call compile, but still return the original,
-        #                  unmodified result.  This causes the django tocall
+        #                  unmodified result.  This causes the django to call
         #                  load_template again for every include node where of
         #                  course the validation may fail. (incomplete HTML
         #                  tree, maybe only javascript, etc...)

@@ -126,6 +126,6 @@ def get_options_for_app(app):
             if isinstance(v, tuple):
                 result += list(v)
             else:
-                raise Exception('Configuration error in TEMPLATE_PREPROCESSOR_OPTIONS')
+                raise Exception('Configuration error in settings.TEMPLATE_PREPROCESSOR_OPTIONS')
 
     return result

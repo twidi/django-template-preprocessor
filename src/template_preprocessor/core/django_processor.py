@@ -520,76 +520,15 @@ __DJANGO_BLOCK_ELEMENTS = {
 
 # ====================================[ Check parser settings in template {% ! ... %} ]================
 
-class PreProcessSettings(object):
-    def __init__(self, path=''):
-        # Default settings
-        self.whitespace_compression = True
-        self.preprocess_translations = True
-        self.preprocess_urls = True
-        self.preprocess_variables = True
-        self.remove_block_tags = True # Should propably not be disabled
-        self.merge_all_load_tags = True
-        self.execute_preprocessable_tags = True
-        self.preprocess_macros = True
-        self.preprocess_ifdebug = True # Should probably always be True
-        self.remove_some_tags = True # As we lack a better settings name
 
-        # HTML processor settings
-        self.is_html = True
-
-        self.compile_css = True
-        self.compile_javascript = True
-        self.ensure_quotes_around_html_attributes = False # Not reliable for now...
-        self.merge_internal_css = False
-        self.merge_internal_javascript = False # Not always recommended...
-        self.remove_empty_class_attributes = False
-        self.pack_external_javascript = False
-        self.pack_external_css = False
-        self.validate_html = True
-
-    def change(self, value, node=None):
-        actions = {
-            'whitespace-compression': ('whitespace_compression', True),
-            'no-whitespace-compression': ('whitespace_compression', False),
-            'merge-internal-javascript': ('merge_internal_javascript', True),
-            'merge-internal-css': ('merge_internal_css', True),
-            'html': ('is_html', True), # Enable HTML extensions
-            'no-html': ('is_html', False), # Disable all HTML specific options
-            'no-macro-preprocessing': ('preprocess_macros', False),
-            'html-remove-empty-class-attributes': ('remove_empty_class_attributes', True),
-            'pack-external-javascript': ('pack_external_javascript', True),
-            'pack-external-css': ('pack_external_css', True),
-            'compile-css': ('compile_css', True),
-            'compile-javascript': ('compile_javascript', True),
-            'validate-html': ('validate_html', True),
-            'no-validate-html': ('validate_html', False),
-        }
-
-        if value in actions:
-            setattr(self, actions[value][0], actions[value][1])
-        else:
-            if node:
-                raise CompileException(node, 'No such template preprocessor option: %s' % value)
-            else:
-                raise CompileException('No such template preprocessor option: %s (in settings.py)' % value)
-
-
-def _get_preprocess_settings(tree, extra_options):
+def _update_preprocess_settings(tree, context):
     """
     Look for parser configuration tags in the template tree.
     Return a dictionary of the compile options to use.
     """
-    options = PreProcessSettings(tree.path)
-
     for c in tree.child_nodes_of_class([ DjangoPreprocessorConfigTag ]):
         for o in c.preprocessor_options:
-            options.change(o, c)
-
-    for o in extra_options or []:
-        options.change(o)
-
-    return options
-
+            context.options.change(o, c)
 
 
 # ====================================[ 'Patched' class definitions ]=====================================
@@ -623,7 +562,7 @@ def apply_method_on_parse_tree(tree, class_, method, *args, **kwargs):
             apply_method_on_parse_tree(c, class_, method, *args, **kwargs)
 
 
-def _process_extends(tree, loader):
+def _process_extends(tree, context):
     """
     {% extends ... %}
     When this tree extends another template. Load the base template,
@@ -634,7 +573,7 @@ def _process_extends(tree, loader):
 
         for c in tree.children:
             if isinstance(c, DjangoExtendsTag) and not c.template_name_is_variable:
-                base_tree = loader(c.template_name)
+                base_tree = context.load(c.template_name)
                 break
 
         if base_tree:
@@ -670,9 +609,11 @@ def _process_extends(tree, loader):
 
             # We shouldn't have any blocks left (if so, they don't have a match in the parent)
             if outer_tree_blocks:
-                # TODO: make this error optional, or turn into a warning.
-                raise CompileException(outer_tree_blocks[0],
-                        'Found {%% block %s %%} which has not been found in the parent' % outer_tree_blocks[0].block_name)
+                warning = 'Found {%% block %s %%} which has not been found in the parent' % outer_tree_blocks[0].block_name
+                if context.options.disallow_orphan_blocks:
+                    raise CompileException(outer_tree_blocks[0], warning)
+                else:
+                    context.raise_warning(outer_tree_blocks[0], warning)
 
             # Move every {% load %} and {% ! ... %} to the base tree
             for l in tree.child_nodes_of_class([ DjangoLoadTag, DjangoPreprocessorConfigTag ]):
@@ -688,7 +629,7 @@ def _process_extends(tree, loader):
         return tree
 
 
-def _preprocess_includes(tree, loader):
+def _preprocess_includes(tree, context):
     """
     Look for all the {% include ... %} tags and replace it by their include.
     """
@@ -698,7 +639,7 @@ def _preprocess_includes(tree, loader):
         if not block.template_name_is_variable:
             try:
                 # Parse include
-                include_tree = loader(block.template_name)
+                include_tree = context.load(block.template_name)
 
                 # Move tree from included file into {% include %}
                 block.__class__ = DjangoPreprocessedInclude
@@ -712,7 +653,7 @@ def _preprocess_includes(tree, loader):
                 raise CompileException(block, 'Template in {%% include %%} tag not found (%s)' % block.template_name)
 
 
-def _preprocess_decorate_tags(tree, loader):
+def _preprocess_decorate_tags(tree, context):
     """
     Replace {% decorate "template.html" %}...{% enddecorate %} by the include,
     and fill in {{ content }}
@@ -729,7 +670,7 @@ def _preprocess_decorate_tags(tree, loader):
 
         # Replace content
         try:
-            include_tree = loader(block.template_name)
+            include_tree = context.load(block.template_name)
 
             for content_var in include_tree.child_nodes_of_class([ DjangoVariable ]):
                 if content_var.varname == 'decorater.content':
@@ -949,12 +890,12 @@ from template_preprocessor.core.html_processor import compile_html
 
 
 
-def parse(source_code, path, loader, main_template=False, options=None):
+def parse(source_code, path, context, main_template=False):
     """
     Parse the code.
     - source_code: string
-    - loader: method to be called to include other templates.
     - path: for attaching meta information to the tree.
+    - context: preprocess context (holding the settings/dependecies/warnings, ...)
     - main_template: False for includes/extended templates. True for the
                      original path that was called.
     """
@@ -977,16 +918,17 @@ def parse(source_code, path, loader, main_template=False, options=None):
     # === Actions ===
 
     # Extend parent template and process includes
-    tree = _process_extends(tree, loader) # NOTE: this returns a new tree!
-    _preprocess_includes(tree, loader)
-    _preprocess_decorate_tags(tree, loader)
+    tree = _process_extends(tree, context) # NOTE: this returns a new tree!
+    _preprocess_includes(tree, context)
+    _preprocess_decorate_tags(tree, context)
 
 
     # Following actions only need to be applied if this is the 'main' tree.
     # It does not make sense to apply it on every include, and then again
     # on the complete tree.
     if main_template:
-        options = _get_preprocess_settings(tree, options)
+        _update_preprocess_settings(tree, context)
+        options = context.options
 
         # Do translations
         if options.preprocess_translations:
@@ -1029,6 +971,6 @@ def parse(source_code, path, loader, main_template=False, options=None):
 
         # HTML compiler
         if options.is_html:
-            compile_html(tree, options)
+            compile_html(tree, context)
 
     return tree
