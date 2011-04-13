@@ -58,23 +58,29 @@ def template_iterator():
             for f in walk(dir):
                 yield dir, f
 
-
-def load_template_source(path):
+def get_template_path(template):
     """
-    Look in the template loaders for this template, return content.
+    Turn template path into absolute path
     """
     for dir in settings.TEMPLATE_DIRS:
-        p = os.path.join(dir, path)
+        p = os.path.join(dir, template)
         if os.path.exists(p):
-            return codecs.open(p, 'r', 'utf-8').read()
+            return p
 
     for app in settings.INSTALLED_APPS:
-        p = os.path.join(_get_path_form_app(app), 'templates', path)
+        p = os.path.join(_get_path_form_app(app), 'templates', template)
         if os.path.exists(p):
-            return codecs.open(p, 'r', 'utf-8').read()
+            return p
 
-    raise TemplateDoesNotExist, path
+    raise TemplateDoesNotExist, template
 
+
+def load_template_source(template):
+    """
+    Get template source code.
+    """
+    path = get_template_path(template)
+    return codecs.open(path, 'r', 'utf-8').read()
 
 
 def get_options_for_path(path):

@@ -14,7 +14,7 @@ from django.template import TemplateDoesNotExist
 from template_preprocessor.core import compile
 from template_preprocessor.core.lexer import CompileException
 
-from template_preprocessor.utils import language, template_iterator, load_template_source
+from template_preprocessor.utils import language, template_iterator, load_template_source, get_template_path
 from template_preprocessor.utils import get_options_for_path
 
 
@@ -59,13 +59,33 @@ class Command(BaseCommand):
                         print ('Deleting old template: %s' % path)
                     os.remove(path)
 
+        queue = self._build_compile_queue(options['languages'], all_templates)
+
+        for i in range(0, len(queue)):
+            lang = queue[i][0]
+            with language(lang):
+                if self.verbosity >= 2:
+                    print termcolor.colored('%i / %i |' % (i, len(queue)), 'yellow'),
+                    print termcolor.colored('(%s)' % lang, 'yellow'),
+                    print termcolor.colored(queue[i][1], 'green')
+
+                self._compile_template(*queue[i])
+
+        # Show all errors once again.
+        print u'\n*** %i Files processed, %i compile errors ***' % (len(queue), len(self._errors))
+
+
+    def _build_compile_queue(self, languages, all_templates=True):
+        """
+        Build a list of all the templates to be compiled.
+        """
         # Create compile queue
-        queue = set()
+        queue = set() # Use a set, avoid duplication of records.
 
         if self.verbosity >= 2:
             print 'Building queue'
 
-        for lang in options['languages']:
+        for lang in languages:
             # Now compile all templates to the cache directory
             for dir, t in template_iterator():
                 input_path = os.path.join(dir, t)
@@ -87,21 +107,16 @@ class Command(BaseCommand):
 
                     queue.add( (lang, t, input_path, output_path) )
 
+                    # When this file has to be compiled, and other files depend
+                    # on this template also compile the other templates.
+                    if os.path.exists(output_path + '-c-used-by'):
+                        for t2 in open(output_path + '-c-used-by', 'r').read().split('\n'):
+                            if t2:
+                                queue.add( (lang, t2, get_template_path(t2), self._make_output_path(lang, t2)) )
+
         queue = list(queue)
         queue.sort()
-
-        for i in range(0, len(queue)):
-            lang = queue[i][0]
-            with language(lang):
-                if self.verbosity >= 2:
-                    print termcolor.colored('%i / %i |' % (i, len(queue)), 'yellow'),
-                    print termcolor.colored('(%s)' % lang, 'yellow'),
-                    print termcolor.colored(queue[i][1], 'green')
-
-                self._compile_template(*queue[i])
-
-        # Show all errors once again.
-        print u'\n*** %i Files processed, %i compile errors ***' % (len(queue), len(self._errors))
+        return queue
 
 
     def _make_output_path(self, language, template):
