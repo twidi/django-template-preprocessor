@@ -112,7 +112,10 @@ class Command(BaseCommand):
                     if os.path.exists(output_path + '-c-used-by'):
                         for t2 in open(output_path + '-c-used-by', 'r').read().split('\n'):
                             if t2:
-                                queue.add( (lang, t2, get_template_path(t2), self._make_output_path(lang, t2)) )
+                                try:
+                                    queue.add( (lang, t2, get_template_path(t2), self._make_output_path(lang, t2)) )
+                                except TemplateDoesNotExist, e:
+                                    pass # Reference to non-existing template
 
         queue = list(queue)
         queue.sort()
