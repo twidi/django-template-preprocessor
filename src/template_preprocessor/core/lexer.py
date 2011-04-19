@@ -69,6 +69,14 @@ class Token(object):
             if c.name == name:
                 yield c
 
+    def is_i(self, class_):
+        """
+        node.is(TokenClass)
+        is synonym for:
+        isinstance(node, TokenClass)
+        """
+        return isinstance(self, class_)
+
     def clone(self):
         """
         Clone everything within the parse tree.

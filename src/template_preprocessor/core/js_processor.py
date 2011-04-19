@@ -32,18 +32,21 @@ __JS_STATES = {
             State.Transition(r'\s*\}\s*', (StopToken('js-scope'), Shift(), )),
             State.Transition(r'/\*', (Push('multiline-comment'), Shift(), )),
             State.Transition(r'//', (Push('singleline-comment'), Shift(), )),
-            State.Transition(r'"', (Push('double-quoted-string'), StartToken('js-double-quoted-string'), Record(), Shift(), )),
-            State.Transition(r"'", (Push('single-quoted-string'), StartToken('js-single-quoted-string'), Record(), Shift(), )),
+            State.Transition(r'"', (Push('double-quoted-string'), StartToken('js-double-quoted-string'), Shift(), )),
+            State.Transition(r"'", (Push('single-quoted-string'), StartToken('js-single-quoted-string'), Shift(), )),
 
             State.Transition(r'(break|catch|const|continue|debugger|default|delete|do|else|enum|false|finally|for|function|case|if|in|instanceof|new|null|return|switch|this|throw|true|try|typeof|var|void|while|with)(?![a-zA-Z0-9_$])',
                                     (StartToken('js-keyword'), Record(), Shift(), StopToken())),
 
                 # Whitespaces are recorded in the operator. (They can be removed later on by a simple trim operator.)
-            State.Transition(r'\s*([;,=?:|^&=!<>*%~\.\[(+-])\s*', (StartToken('js-operator'), Record(), Shift(), StopToken(), )),
+            State.Transition(r'\s*([;,=?:|^&=!<>*%~\.+-])\s*', (StartToken('js-operator'), Record(), Shift(), StopToken(), )),
 
-                # (same to above line, but) a closing bracket, like after a function call, means we get in a state similar to after
-                # a varname, where a slash means a division rather than the start of a regex.
-            State.Transition(r'\s*([)\]])\s*', (StartToken('js-operator'), Record(), Shift(), StopToken(), Push('after-varname') )),
+                # Place ( ... ) and [ ... ] in separate nodes.
+                # After closing parentheses/square brakets. Go 'after-varname' (because the context is the same.)
+            State.Transition(r'\s*(\()\s*', (StartToken('js-parentheses'), Shift(), )),
+            State.Transition(r'\s*(\))\s*', (StopToken('js-parentheses'), Shift(), Push('after-varname'), )),
+            State.Transition(r'\s*(\[)\s*', (StartToken('js-square-brackets'), Shift(), )),
+            State.Transition(r'\s*(\])\s*', (StopToken('js-square-brackets'), Shift(), Push('after-varname'), )),
 
                 # Varnames and numbers
             State.Transition(r'[a-zA-Z_$][a-zA-Z_$0-9]*', (StartToken('js-varname'), Record(), Shift(), StopToken(), Push('after-varname') )),
@@ -58,13 +61,15 @@ __JS_STATES = {
             State.Transition(r'.|\s', (Error('Error in parser #1'),)),
             ),
     'double-quoted-string': State(
-            State.Transition(r'"', (Record(), Pop(), Shift(), StopToken(), )),
+            State.Transition(r'"', (Pop(), Shift(), StopToken(), )),
+            State.Transition(r"\\'", (Record("'"), Shift(), )),
             State.Transition(r'\\.', (Record(), Shift(), )),
             State.Transition(r'[^"\\]+', (Record(), Shift(), )),
             State.Transition(r'.|\s', (Error('Error in parser #2'),)),
             ),
     'single-quoted-string': State(
-            State.Transition(r"'", (Record(), Pop(), Shift(), StopToken(), )),
+            State.Transition(r"'", (Pop(), Shift(), StopToken(), )),
+            State.Transition(r'\\"', (Record('"'), Shift(), )),
             State.Transition(r'\\.', (Record(), Shift() )),
             State.Transition(r"[^'\\]+", (Record(), Shift(), )),
             State.Transition(r'.|\s', (Error('Error in parser #3'),)),
@@ -110,6 +115,7 @@ __JS_STATES = {
 class JavascriptNode(HtmlContent):
     pass
 
+
 class JavascriptScope(JavascriptNode):
     """
     Contains:
@@ -124,28 +130,52 @@ class JavascriptScope(JavascriptNode):
         handler(u'}')
 
 
+class JavascriptParentheses(JavascriptNode):
+    """
+    Contains:
+    Something between ( parentheses ) in javascript.
+    """
+    def output(self, handler):
+        handler(u'(')
+        Token.output(self, handler)
+        handler(u')')
+
+
+class JavascriptSquareBrackets(JavascriptNode):
+    """
+    Contains:
+    Something between ( parentheses ) in javascript.
+    """
+    def output(self, handler):
+        handler(u'[')
+        Token.output(self, handler)
+        handler(u']')
+
+
 class JavascriptWhiteSpace(JavascriptNode):
     pass
+
 
 class JavascriptOperator(JavascriptNode):
     """
     Javascript operator.
     """
     @property
+    def operator(self):
+        return self.output_as_string().strip()
+
+    @property
     def is_comma(self):
-        return self.output_as_string().strip() == ','
+        return self.operator == ','
 
     @property
     def is_semicolon(self):
-        return self.output_as_string().strip() == ';'
+        return self.operator == ';'
 
     @property
     def is_colon(self):
-        return self.output_as_string().strip() == ''
+        return self.operator == ':'
 
-    @property
-    def operator(self):
-        return self.output_as_string().strip()
 
 class JavascriptKeyword(JavascriptNode):
     """
@@ -173,7 +203,7 @@ class JavascriptVariable(JavascriptNode):
     def set_variable_name(self, varname):
         self.__varname = varname
 
-    def get_variable_value(self):
+    def get_variable_name(self):
         return self.__varname
 
     def output(self, handler):
@@ -188,12 +218,31 @@ class JavascriptVariable(JavascriptNode):
         else:
             Token.output(self, handler)
 
+class JavascriptString(JavascriptNode):
+    @property
+    def value(self):
+        """
+        String value. Has still escaped special characters,
+        but no escapes for quotes.
+        """
+        return self.output_as_string(use_original_output_method=True)
 
-class JavascriptDoubleQuotedString(JavascriptNode):
-    pass
+    def output(self, handler):
+        raise Exception("Don't call output on abstract base class")
 
-class JavascriptSingleQuotedString(JavascriptNode):
-    pass
+class JavascriptDoubleQuotedString(JavascriptString):
+    def output(self, handler):
+        handler(u'"')
+        handler(self.value.replace('"', r'\"'))
+        handler(u'"')
+
+
+class JavascriptSingleQuotedString(JavascriptString):
+    def output(self, handler):
+        handler(u"'")
+        handler(self.value.replace("'", r"\'"))
+        handler(u"'")
+
 
 class JavascriptRegexObject(JavascriptNode):
     pass
@@ -203,6 +252,8 @@ class JavascriptNumber(JavascriptNode):
 
 __JS_EXTENSION_MAPPINGS = {
         'js-scope': JavascriptScope,
+        'js-parentheses': JavascriptParentheses,
+        'js-square-brackets': JavascriptSquareBrackets,
         'js-varname': JavascriptVariable,
         'js-keyword': JavascriptKeyword,
         'js-whitespace': JavascriptWhiteSpace,
@@ -245,8 +296,8 @@ def _compress_javascript_whitespace(js_node, root_node=True):
                 c.children = [u' ']
 
             # Around operators, we can delete all whitespace.
-            if c.name == 'js-operator':
-                c.children = [ u' '.join(c.children).strip() ]
+            if isinstance(c, JavascriptOperator):
+                c.children = [ c.operator ]
 
             _compress_javascript_whitespace(c, root_node=False)
 
@@ -289,6 +340,10 @@ def _minify_variable_names(js_node):
             elif isinstance(c, JavascriptWhiteSpace):
                 pass
 
+            elif isinstance(c, JavascriptParentheses) or isinstance(c, JavascriptSquareBrackets):
+                find_variables(c, scope)
+                next_is_variable = False
+
             elif isinstance(c, Token):
                 find_variables(c, scope)
                 next_is_variable = False
@@ -314,21 +369,11 @@ def _minify_variable_names(js_node):
             while isinstance(current_node(), JavascriptWhiteSpace):
                 next()
 
-        def skip_whitespace_and_kommas():
-            while isinstance(current_node(), JavascriptWhiteSpace) or \
-                    (isinstance(current_node(), JavascriptOperator) and current_node().output_as_string() == ','):
-                next()
-
-        def exception(message):
-            raise CompileException(current_node(), message)
-
         while i[0] < len(js_node.children):
             # Look for the start of a function
             if isinstance(current_node(), JavascriptKeyword) and current_node().keyword == 'function':
-                next()
-                variables = []
-
                 # Skip whitespace
+                next()
                 skip_whitespace()
 
                 # Skip function name
@@ -337,35 +382,34 @@ def _minify_variable_names(js_node):
                     skip_whitespace()
 
                 # Enter function parameter list
-                if not (isinstance(current_node(), JavascriptOperator) and current_node().output_as_string() == '('):
-                        raise exception('Expected "("')
-
-                next()
-                skip_whitespace()
-
-                # Remember function parameters
-                while isinstance(current_node(), JavascriptVariable):
-                    variables.append(current_node())
-                    next()
-                    skip_whitespace_and_kommas()
-
-                # Leave function parameter list
-                if not (isinstance(current_node(), JavascriptOperator) and current_node().output_as_string() == ')'):
-                        raise exception('Expected "("')
+                if isinstance(current_node(), JavascriptParentheses):
+                    # Remember function parameters
+                    variables = []
+                    need_komma = False
+                    for node in current_node().children:
+                        if isinstance(node, JavascriptWhiteSpace):
+                            pass
+                        elif isinstance(node, JavascriptVariable):
+                            variables.append(current_node())
+                            need_komma = True
+                        elif isinstance(node, JavascriptOperator) and node.output_as_string() == ',' and need_komma:
+                            need_komma = False
+                        else:
+                            raise CompileException(node, 'Unexpected token in function parameter list')
+                else:
+                    raise CompileException(current_node(), 'Expected "("')
 
                 next()
                 skip_whitespace()
 
                 # Following should be a '{', and bind found variables to scope
-                if not isinstance(current_node(), JavascriptScope):
-                        raise exception('Expected "{"')
-
-                for v in variables:
-                    current_node().symbol_table[v.output_as_string()] = v
-
+                if isinstance(current_node(), JavascriptScope):
+                    for v in variables:
+                        current_node().symbol_table[v.output_as_string()] = v
+                else:
+                    raise CompileException(current_node(), 'Expected "{" after function definition')
             else:
                 next()
-
 
 
     find_variables(js_node, js_node)
@@ -383,7 +427,7 @@ def _minify_variable_names(js_node):
         for c in js_node.children:
             # Variables after a dot operator shouldn't be renamed.
             if isinstance(c, JavascriptOperator):
-                skip_next_var = (c.output_as_string().strip() == '.')
+                skip_next_var = (c.operator == '.')
 
             elif isinstance(c, JavascriptVariable):
                 if not skip_next_var:
@@ -464,7 +508,7 @@ def fix_whitespace_bug(js_node):
 
 def _validate_javascript(js_node):
     # Check whether no comma appears at the end of any scope.
-    # e.g.    var x = { y: z, }SX // causes problems in IE6 and IE7
+    # e.g.    var x = { y: z, } // causes problems in IE6 and IE7
     for scope in js_node.child_nodes_of_class([JavascriptScope]):
         if scope.children:
             last_child = scope.children[-1]
@@ -472,9 +516,11 @@ def _validate_javascript(js_node):
                 raise CompileException(last_child,
                             'Please remove colon at the end of Javascript object (not supported by IE6 and IE7)')
 
-    # Check whether no semi-colons are missing. Javascript has optional semicolons and uses an insertion
-    # mechanism, but it's very bad to rely on this. If semicolons are missing, we consider the code invalid.
-    # Every statement should end with a semi colon, except: for, function, if, switch, try and while (See JSlint.com)
+    # Check whether no semi-colons are missing. Javascript has optional
+    # semicolons and uses an insertion mechanism, but it's very bad to rely on
+    # this. If semicolons are missing, we consider the code invalid.  Every
+    # statement should end with a semi colon, except: for, function, if,
+    # switch, try and while (See JSlint.com)
     for scope in js_node.child_nodes_of_class([JavascriptScope]):
         i = [0] # Variable by referece
 
@@ -501,32 +547,10 @@ def _validate_javascript(js_node):
                     next()
                 elif isinstance(current_node(), JavascriptScope):
                     return
-                elif isinstance(current_node(), JavascriptOperator) and current_node().operator == '(':
+                elif isinstance(current_node(), JavascriptParentheses):
                     return
                 else:
                     raise CompileException(c, 'Expected opening bracket. Please check your Javascript code.')
-
-        def skip_parameter_list():
-            assert isinstance(current_node(), JavascriptOperator)
-            stack = [ current_node().operator ]
-            next()
-
-            while i[0] < len(scope.children):
-                if not stack:
-                    return
-
-                c = current_node()
-
-                if isinstance(c, JavascriptOperator):
-                    if c.operator in ('(', '['):
-                        stack.append(c.operator)
-                    elif c.operator == ')':
-                        if stack[-1] == '(':
-                            stack.pop()
-                    elif c.operator == ']':
-                        if stack[-1] == '[':
-                            stack.pop()
-                next()
 
         def get_last_non_whitespace_token():
             if i[0] > 0:
@@ -563,17 +587,17 @@ def _validate_javascript(js_node):
                 # Do this by using a simple push/pop stack
                 # Some blocks, like try {}  don't have parameters.
                 go_to_open_bracket()
-                if isinstance(current_node(), JavascriptOperator) and current_node().operator == '(':
-                    skip_parameter_list()
+                if isinstance(current_node(), JavascriptParentheses):
+                    i[0] += 1
 
                 i[0] -= 1
                 semi_colon_required = False
 
             elif isinstance(c, JavascriptKeyword) and c.keyword == 'var':
-                # The previous token, before the 'var' keyword should be '{', '}', or ';'
+                # The previous token, before the 'var' keyword should be semi-colon
                 last_token = get_last_non_whitespace_token()
                 if last_token:
-                    if (isinstance(last_token, JavascriptOperator) and last_token.operator in ('{', '}', ';')):
+                    if isinstance(last_token, JavascriptOperator) and last_token.operator == ';':
                         pass
                     elif isinstance(last_token, JavascriptScope) or isinstance(last_token, DjangoTag):
                         pass
@@ -581,20 +605,12 @@ def _validate_javascript(js_node):
                         found_missing()
 
             elif isinstance(c, JavascriptOperator):
-                if c.is_semicolon or c.is_colon:
-                    semi_colon_required = False
+                # Colons, semicolons, ...
+                # No semicolon required before or after
+                semi_colon_required = False
 
-                elif c.operator in ('(', '['):
-                    skip_parameter_list()
-                    i[0] -= 1
-                    semi_colon_required = True
-
-                elif c.operator in (')', ']'):
-                    raise CompileException(current_node(), 'Unexpected closing bracket, did not find an opening match. Please check your Javascript code.')
-
-                else:
-                    # No semicolon required before or after
-                    semi_colon_required = False
+            elif isinstance(c, JavascriptParentheses) or isinstance(c, JavascriptSquareBrackets):
+                semi_colon_required = True
 
             elif isinstance(c, JavascriptScope):
                 semi_colon_required = False
@@ -610,6 +626,42 @@ def _validate_javascript(js_node):
                 pass
 
             next()
+
+
+def _validate_gettext(js_node):
+    """
+    Validate whether gettext(...) function in javascript get a string as
+    parameter. (Or concatenation of several strings)
+    """
+    for scope in js_node.child_nodes_of_class([JavascriptScope]):
+        nodes = scope.children
+        for i, c in enumerate(nodes):
+            if isinstance(c, JavascriptKeyword) and c.keyword == 'function':
+                # Is this a gettext method?
+                i += 1
+                if isinstance(nodes[i], JavascriptVariable) and nodes[i].get_variable_name() == 'gettext':
+                    # Test '('
+                    i += 1
+                    if not isinstance(nodes[i], JavascriptParentheses):
+                        raise CompileException(nodes[i], 'Expected opening bracket after gettext function');
+
+                    body = []
+
+                    nodes2 = nodes[i].children
+                    for j, d in enumerate(nodes2):
+                        if isinstance(nodes2[j], JavascriptOperator) and nodes2[j].operator == '+':
+                            # Skip concatenation operator
+                            pass
+                        elif (isinstance(nodes2[j], JavascriptDoubleQuotedString) or
+                                    isinstance(nodes2[j], JavascriptSingleQuotedString)):
+                            body.append(nodes2.value)
+                        else:
+                            raise CompileException(d, 'Unexpected token inside gettext(...)')
+
+
+def _preprocess_gettext(js_node):
+    # Replace gettext(...) call by their translation.
+    pass
 
 
 def compile_javascript(js_node):
@@ -655,8 +707,10 @@ def compile_javascript_string(js_string, path=''):
     # Compile
     _add_javascript_parser_extensions(tree)
     _validate_javascript(tree)
+    _validate_gettext(tree)
     _compress_javascript_whitespace(tree)
     _minify_variable_names(tree)
+    _preprocess_gettext(tree)
 
     fix_whitespace_bug(tree)
 
