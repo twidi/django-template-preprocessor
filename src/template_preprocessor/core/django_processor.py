@@ -922,7 +922,6 @@ def parse(source_code, path, context, main_template=False):
     _preprocess_includes(tree, context)
     _preprocess_decorate_tags(tree, context)
 
-
     # Following actions only need to be applied if this is the 'main' tree.
     # It does not make sense to apply it on every include, and then again
     # on the complete tree.

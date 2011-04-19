@@ -22,6 +22,7 @@ from template_preprocessor.core.lexer import State, StartToken, Push, Record, Sh
 from template_preprocessor.core.lexer_engine import tokenize
 from template_preprocessor.core.html_processor import HtmlContent
 import string
+from django.utils.translation import ugettext as _
 
 __JS_KEYWORDS = 'break|catch|const|continue|debugger|default|delete|do|else|enum|false|finally|for|function|gcase|if|in|instanceof|new|null|return|switch|this|throw|true|try|typeof|var|void|while|with'.split('|')
 
@@ -204,7 +205,7 @@ class JavascriptVariable(JavascriptNode):
         self.__varname = varname
 
     def get_variable_name(self):
-        return self.__varname
+        return self.output_as_string()
 
     def output(self, handler):
         # Yield this node's content, or if the variable name
@@ -628,40 +629,47 @@ def _validate_javascript(js_node):
             next()
 
 
-def _validate_gettext(js_node):
+def _process_gettext(js_node, validate_only=False):
     """
     Validate whether gettext(...) function in javascript get a string as
     parameter. (Or concatenation of several strings)
     """
-    for scope in js_node.child_nodes_of_class([JavascriptScope]):
+    for scope in js_node.child_nodes_of_class([JavascriptScope, JavascriptSquareBrackets, JavascriptParentheses]):
         nodes = scope.children
         for i, c in enumerate(nodes):
-            if isinstance(c, JavascriptKeyword) and c.keyword == 'function':
-                # Is this a gettext method?
+            # Is this a gettext method?
+            if isinstance(nodes[i], JavascriptVariable) and nodes[i].get_variable_name() == 'gettext':
+                gettext = nodes[i]
+
+                # Test '('
                 i += 1
-                if isinstance(nodes[i], JavascriptVariable) and nodes[i].get_variable_name() == 'gettext':
-                    # Test '('
+                while isinstance(nodes[i], JavascriptWhiteSpace):
                     i += 1
-                    if not isinstance(nodes[i], JavascriptParentheses):
-                        raise CompileException(nodes[i], 'Expected opening bracket after gettext function');
 
-                    body = []
+                if isinstance(nodes[i], JavascriptParentheses):
+                    parentheses = nodes[i]
+                else:
+                    raise CompileException(nodes[i], 'Expected opening bracket after gettext function');
 
-                    nodes2 = nodes[i].children
-                    for j, d in enumerate(nodes2):
-                        if isinstance(nodes2[j], JavascriptOperator) and nodes2[j].operator == '+':
-                            # Skip concatenation operator
-                            pass
-                        elif (isinstance(nodes2[j], JavascriptDoubleQuotedString) or
-                                    isinstance(nodes2[j], JavascriptSingleQuotedString)):
-                            body.append(nodes2.value)
-                        else:
-                            raise CompileException(d, 'Unexpected token inside gettext(...)')
+                # Read content of gettext call.
+                body = []
+                for node in parentheses.children:
+                    if isinstance(node, JavascriptOperator) and node.operator == '+':
+                        # Skip concatenation operator
+                        pass
+                    elif isinstance(node, JavascriptString):
+                        body.append(node.value)
+                    else:
+                        raise CompileException(node, 'Unexpected token inside gettext(...)')
 
+                if not validate_only:
+                    # Translate content
+                    translation = _(u''.join(body))
 
-def _preprocess_gettext(js_node):
-    # Replace gettext(...) call by their translation.
-    pass
+                    # Replace gettext(...) call by its translation (in double quotes.)
+                    gettext.__class__ = JavascriptDoubleQuotedString
+                    gettext.children = [ translation.replace('"', r'\"') ]
+                    nodes.remove(parentheses)
 
 
 def compile_javascript(js_node):
@@ -675,22 +683,9 @@ def compile_javascript(js_node):
     template tag nodes, and that we should also parse through the block
     nodes.
     """
-    #_remove_multiline_js_comments(js_node)
+    # Tokenize and compile
     tokenize(js_node, __JS_STATES, [HtmlContent], [DjangoContainer])
-
-    # Javascript parser extensions (required for proper output)
-    _add_javascript_parser_extensions(js_node)
-
-    # Validate javascript
-    _validate_javascript(js_node)
-
-    # Remove meaningless whitespace in javascript code.
-    _compress_javascript_whitespace(js_node)
-
-    # Minify variable names
-    _minify_variable_names(js_node)
-
-    fix_whitespace_bug(js_node)
+    _compile(js_node)
 
 
 def compile_javascript_string(js_string, path=''):
@@ -705,14 +700,28 @@ def compile_javascript_string(js_string, path=''):
     tokenize(tree, __JS_STATES, [Token] )
 
     # Compile
-    _add_javascript_parser_extensions(tree)
-    _validate_javascript(tree)
-    _validate_gettext(tree)
-    _compress_javascript_whitespace(tree)
-    _minify_variable_names(tree)
-    _preprocess_gettext(tree)
-
-    fix_whitespace_bug(tree)
+    _compile(tree)
 
     # Output
     return tree.output_as_string()
+
+
+def _compile(js_node):
+    # Javascript parser extensions (required for proper output)
+    _add_javascript_parser_extensions(js_node)
+
+    # Validate javascript
+    _validate_javascript(js_node)
+
+    # Remove meaningless whitespace in javascript code.
+    _compress_javascript_whitespace(js_node)
+
+    # Preprocess gettext
+    _process_gettext(js_node)
+
+    # Minify variable names
+    _minify_variable_names(js_node)
+
+    fix_whitespace_bug(js_node)
+
+
