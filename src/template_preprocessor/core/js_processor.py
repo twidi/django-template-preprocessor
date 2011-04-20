@@ -419,13 +419,24 @@ def _minify_variable_names(js_node):
     def find_free_variables(js_node, parent_scopes):
         skip_next_var = False
 
-        for c in js_node.children:
+        for index, c in enumerate(js_node.children):
             # Variables after a dot operator shouldn't be renamed.
             if isinstance(c, JavascriptOperator):
                 skip_next_var = (c.operator == '.')
 
             elif isinstance(c, JavascriptVariable):
+                # Test whether this is not the key of a dictionary,
+                # if so, we shouldn't rename it.
+                try:
+                    n = js_node.children[index+1]
+                    if isinstance(n, JavascriptOperator) and n.is_colon:
+                        skip_next_var = True
+                except IndexError, e:
+                    pass
+
+                # If we have to link this var (not after a dot, not before a colon)
                 if not skip_next_var:
+                    # Link variable to definition symbol table
                     varname = c.varname
                     linked = False
                     for s in parent_scopes:
