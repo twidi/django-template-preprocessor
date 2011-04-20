@@ -1020,7 +1020,8 @@ def _pack_external_javascript(tree):
                 # ! Note that we made a list of the child_nodes_of_class iterator,
                 #   this is required because we are removing childs from the list here.
                 if script.is_external:
-                    if script.script_source.startswith(MEDIA_URL):
+                    if ((MEDIA_URL and script.script_source.startswith(MEDIA_URL)) or
+                                (STATIC_URL and script.script_source.startswith(STATIC_URL))):
                         if first:
                             # Replace source
                             script.script_source = new_script_url

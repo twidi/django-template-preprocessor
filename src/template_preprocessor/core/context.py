@@ -4,6 +4,7 @@
 Django template preprocessor.
 Author: Jonathan Slenders, City Live
 """
+from template_preprocessor.core.lexer import CompileException
 
 class Context(object):
     """

@@ -639,37 +639,41 @@ def _process_gettext(js_node, validate_only=False):
         for i, c in enumerate(nodes):
             # Is this a gettext method?
             if isinstance(nodes[i], JavascriptVariable) and nodes[i].get_variable_name() == 'gettext':
-                gettext = nodes[i]
+                try:
+                    gettext = nodes[i]
 
-                # Test '('
-                i += 1
-                while isinstance(nodes[i], JavascriptWhiteSpace):
+                    # Test '('
                     i += 1
+                    while isinstance(nodes[i], JavascriptWhiteSpace):
+                        i += 1
 
-                if isinstance(nodes[i], JavascriptParentheses):
-                    parentheses = nodes[i]
-                else:
-                    raise CompileException(nodes[i], 'Expected opening bracket after gettext function');
+                    # When gettext is followed by '()', this is a call to gettext, otherwise, gettext is used
+                    # as a variable.
+                    if isinstance(nodes[i], JavascriptParentheses):
+                        parentheses = nodes[i]
 
-                # Read content of gettext call.
-                body = []
-                for node in parentheses.children:
-                    if isinstance(node, JavascriptOperator) and node.operator == '+':
-                        # Skip concatenation operator
-                        pass
-                    elif isinstance(node, JavascriptString):
-                        body.append(node.value)
-                    else:
-                        raise CompileException(node, 'Unexpected token inside gettext(...)')
+                        # Read content of gettext call.
+                        body = []
+                        for node in parentheses.children:
+                            if isinstance(node, JavascriptOperator) and node.operator == '+':
+                                # Skip concatenation operator
+                                pass
+                            elif isinstance(node, JavascriptString):
+                                body.append(node.value)
+                            else:
+                                raise CompileException(node, 'Unexpected token inside gettext(...)')
 
-                if not validate_only:
-                    # Translate content
-                    translation = _(u''.join(body))
+                        if not validate_only:
+                            # Translate content
+                            translation = _(u''.join(body))
 
-                    # Replace gettext(...) call by its translation (in double quotes.)
-                    gettext.__class__ = JavascriptDoubleQuotedString
-                    gettext.children = [ translation.replace('"', r'\"') ]
-                    nodes.remove(parentheses)
+                            # Replace gettext(...) call by its translation (in double quotes.)
+                            gettext.__class__ = JavascriptDoubleQuotedString
+                            gettext.children = [ translation.replace('"', r'\"') ]
+                            nodes.remove(parentheses)
+                except IndexError, i:
+                    # i got out of the nodes array
+                    pass
 
 
 def compile_javascript(js_node):
