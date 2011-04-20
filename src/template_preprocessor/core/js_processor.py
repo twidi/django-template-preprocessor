@@ -201,11 +201,13 @@ class JavascriptVariable(JavascriptNode):
     def has_been_linked(self):
         return bool(self.__link_to)
 
-    def set_variable_name(self, varname):
-        self.__varname = varname
-
-    def get_variable_name(self):
+    @property
+    def varname(self):
         return self.output_as_string()
+
+    @varname.setter
+    def varname(self, varname):
+        self.__varname = varname
 
     def output(self, handler):
         # Yield this node's content, or if the variable name
@@ -317,21 +319,26 @@ def _minify_variable_names(js_node):
     global_variable_names = []
 
     # Walk through all the JavascriptScope elements in the tree.
-    # Detect variable declaration (variables preceded by a 'function' or 'var' keyword.
-    # Save in the scope that it declares a variable with that name.
+    # Detect variable declaration (variables preceded by a 'function' or 'var'
+    # keyword.  Save in the scope that it declares a variable with that name.
     # (do this recursively for every javascript scope.)
     def find_variables(js_node, scope, in_root_node=True):
         next_is_variable = False
-        for c in js_node.children:
+        for index, c in enumerate(js_node.children):
             # Look for 'function' and 'var'
             if isinstance(c, JavascriptKeyword) and c.keyword in ('function', 'var') and not in_root_node:
                 next_is_variable = True
 
-                # NOTE: the `in_root_node` check is required because "var varname" should not be renamed, if it's
-                # been declared in the global scope.
+                # NOTE: the `in_root_node` check is required because "var
+                # varname" should not be renamed, if it's been declared in the
+                # global scope. We only want to rename variables in private
+                # nested scopes.
+
+                if c.keyword == 'function':
+                    find_variables_in_function_parameter_list(js_node.children[index:])
 
             elif isinstance(c, JavascriptVariable) and next_is_variable:
-                scope.symbol_table[c.output_as_string()] = c
+                scope.symbol_table[c.varname] = c
                 next_is_variable = False
 
             elif isinstance(c, JavascriptScope):
@@ -357,64 +364,51 @@ def _minify_variable_names(js_node):
     # In the following example are 'varname1' and 'varname2' variable declarations
     # in the scope between the curly brackets.
     # function(varname1, varname2, ...)  {   ... }
-    def find_variables_2(js_node, scope):
-        i = [0] # We need a variable by referece here, to be able to change it in following functions.
+    def find_variables_in_function_parameter_list(nodelist):
+        # The `nodelist` parameter is the nodelist of the parent parsenode, starting with the 'function' keyword
+        assert isinstance(nodelist[0], JavascriptKeyword) and nodelist[0].keyword == 'function'
+        i = 1
 
-        def next():
-            i[0] += 1
+        while isinstance(nodelist[i], JavascriptWhiteSpace):
+            i += 1
 
-        def current_node():
-            return js_node.children[i[0]]
+        # Skip function name (and optional whitespace after function name)
+        if isinstance(nodelist[i], JavascriptVariable):
+            i += 1
+            while isinstance(nodelist[i], JavascriptWhiteSpace):
+                i += 1
 
-        def skip_whitespace():
-            while isinstance(current_node(), JavascriptWhiteSpace):
-                next()
-
-        while i[0] < len(js_node.children):
-            # Look for the start of a function
-            if isinstance(current_node(), JavascriptKeyword) and current_node().keyword == 'function':
-                # Skip whitespace
-                next()
-                skip_whitespace()
-
-                # Skip function name
-                if isinstance(current_node(), JavascriptVariable):
-                    next()
-                    skip_whitespace()
-
-                # Enter function parameter list
-                if isinstance(current_node(), JavascriptParentheses):
-                    # Remember function parameters
-                    variables = []
-                    need_komma = False
-                    for node in current_node().children:
-                        if isinstance(node, JavascriptWhiteSpace):
-                            pass
-                        elif isinstance(node, JavascriptVariable):
-                            variables.append(current_node())
-                            need_komma = True
-                        elif isinstance(node, JavascriptOperator) and node.output_as_string() == ',' and need_komma:
-                            need_komma = False
-                        else:
-                            raise CompileException(node, 'Unexpected token in function parameter list')
+        # Enter function parameter list
+        if isinstance(nodelist[i], JavascriptParentheses):
+            # Remember function parameters
+            variables = []
+            need_comma = False # comma is the param separator
+            for n in nodelist[i].children:
+                if isinstance(n, JavascriptWhiteSpace):
+                    pass
+                elif isinstance(n, JavascriptVariable):
+                    variables.append(n)
+                    need_comma = True
+                elif isinstance(n, JavascriptOperator) and n.is_comma and need_comma:
+                    need_comma = False
                 else:
-                    raise CompileException(current_node(), 'Expected "("')
+                    raise CompileException(node, 'Unexpected token in function parameter list')
 
-                next()
-                skip_whitespace()
+            # Skip whitespace after parameter list
+            i += 1
+            while isinstance(nodelist[i], JavascriptWhiteSpace):
+                i += 1
 
-                # Following should be a '{', and bind found variables to scope
-                if isinstance(current_node(), JavascriptScope):
-                    for v in variables:
-                        current_node().symbol_table[v.output_as_string()] = v
-                else:
-                    raise CompileException(current_node(), 'Expected "{" after function definition')
+            # Following should be a '{', and bind found variables to scope
+            if isinstance(nodelist[i], JavascriptScope):
+                for v in variables:
+                    nodelist[i].symbol_table[v.varname] = v
             else:
-                next()
-
+                raise CompileException(nodelist[i], 'Expected "{" after function definition')
+        else:
+            raise CompileException(nodelist[i], 'Expected "(" after function keyword')
 
     find_variables(js_node, js_node)
-    find_variables_2(js_node, js_node)
 
 
     # Walk again through the tree. For all the variables: look in the parent
@@ -432,7 +426,7 @@ def _minify_variable_names(js_node):
 
             elif isinstance(c, JavascriptVariable):
                 if not skip_next_var:
-                    varname = c.output_as_string()
+                    varname = c.varname
                     linked = False
                     for s in parent_scopes:
                         if varname in s.symbol_table:
@@ -481,7 +475,7 @@ def _minify_variable_names(js_node):
             for s in js_node.symbol_table:
                 new_name = generate_varname(avoid_names)
                 avoid_names = avoid_names + [ new_name ]
-                js_node.symbol_table[s].set_variable_name(new_name)
+                js_node.symbol_table[s].varname = new_name
 
         for c in js_node.children:
             if isinstance(c, Token):
@@ -638,7 +632,7 @@ def _process_gettext(js_node, validate_only=False):
         nodes = scope.children
         for i, c in enumerate(nodes):
             # Is this a gettext method?
-            if isinstance(nodes[i], JavascriptVariable) and nodes[i].get_variable_name() == 'gettext':
+            if isinstance(nodes[i], JavascriptVariable) and nodes[i].varname == 'gettext':
                 try:
                     gettext = nodes[i]
 
