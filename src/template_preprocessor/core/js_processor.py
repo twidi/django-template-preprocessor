@@ -536,28 +536,6 @@ def _validate_javascript(js_node):
         def current_node():
             return scope.children[i[0]]
 
-        def skip_optional_function_name():
-            while i[0] < len(scope.children):
-                if isinstance(current_node(), JavascriptWhiteSpace):
-                    next()
-                elif isinstance(current_node(), JavascriptVariable):
-                    next()
-                    return
-                else:
-                    return
-
-        def go_to_open_bracket():
-            c = current_node()
-            while i[0] < len(scope.children):
-                if isinstance(current_node(), JavascriptWhiteSpace):
-                    next()
-                elif isinstance(current_node(), JavascriptScope):
-                    return
-                elif isinstance(current_node(), JavascriptParentheses):
-                    return
-                else:
-                    raise CompileException(c, 'Expected opening bracket. Please check your Javascript code.')
-
         def get_last_non_whitespace_token():
             if i[0] > 0:
                 j = i[0] - 1
@@ -565,7 +543,6 @@ def _validate_javascript(js_node):
                         j -= 1
                 if j:
                     return scope.children[j]
-
 
         def found_missing():
             raise CompileException(current_node(), 'Missing semicolon detected. Please check your Javascript code.')
@@ -579,25 +556,45 @@ def _validate_javascript(js_node):
                 if (semi_colon_required):
                     found_missing()
 
+                semi_colon_required = False
+
                 if c.keyword == 'function':
+                    # One *exception*: When this is an function-assignment, a
+                    # semi-colon IS required after this statement.
+                    last_token = get_last_non_whitespace_token()
+                    if isinstance(last_token, JavascriptOperator) and last_token.operator == '=':
+                        semi_colon_required = True
+
                     # Skip keyword
                     next()
 
                     # and optional also function name
-                    skip_optional_function_name()
+                    while isinstance(current_node(), JavascriptWhiteSpace):
+                        next()
+                    if isinstance(current_node(), JavascriptVariable):
+                        next()
                 else:
                     # Skip keyword
                     next()
 
-                # Find the end of the '(...)' parameter list, no semicolon required afterwards.
-                # Do this by using a simple push/pop stack
+                # Skip whitespace
+                while isinstance(current_node(), JavascriptWhiteSpace):
+                    next()
+
+                # Skip over the  '(...)' parameter list
                 # Some blocks, like try {}  don't have parameters.
-                go_to_open_bracket()
                 if isinstance(current_node(), JavascriptParentheses):
-                    i[0] += 1
+                    next()
+
+                # Skip whitespace
+                while isinstance(current_node(), JavascriptWhiteSpace):
+                    next()
+
+                # Skip scope { ... }
+                if isinstance(current_node(), JavascriptScope):
+                    next()
 
                 i[0] -= 1
-                semi_colon_required = False
 
             elif isinstance(c, JavascriptKeyword) and c.keyword == 'var':
                 # The previous token, before the 'var' keyword should be semi-colon
