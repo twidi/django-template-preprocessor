@@ -678,7 +678,7 @@ def _process_gettext(js_node, validate_only=False):
                     pass
 
 
-def compile_javascript(js_node):
+def compile_javascript(js_node, context):
     """
     Compile the javascript nodes to more compact code.
     - Remove comments
@@ -691,10 +691,10 @@ def compile_javascript(js_node):
     """
     # Tokenize and compile
     tokenize(js_node, __JS_STATES, [HtmlContent], [DjangoContainer])
-    _compile(js_node)
+    _compile(js_node, context)
 
 
-def compile_javascript_string(js_string, path=''):
+def compile_javascript_string(js_string, context, path=''):
     """
     Compile JS code (can be used for external javascript files)
     """
@@ -706,13 +706,13 @@ def compile_javascript_string(js_string, path=''):
     tokenize(tree, __JS_STATES, [Token] )
 
     # Compile
-    _compile(tree)
+    _compile(tree, context)
 
     # Output
     return tree.output_as_string()
 
 
-def _compile(js_node):
+def _compile(js_node, context):
     # Javascript parser extensions (required for proper output)
     _add_javascript_parser_extensions(js_node)
 

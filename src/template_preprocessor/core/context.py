@@ -6,6 +6,18 @@ Author: Jonathan Slenders, City Live
 """
 from template_preprocessor.core.lexer import CompileException
 
+class GettextEntry(object):
+    def __init__(self, path, line, column, text):
+        self.path = path
+        self.line = line
+        self.column = column
+        self.text = text
+
+    def __unicode__(self):
+        return "%s (line %s, column %s)" % (node.path, node.line, node.column)
+
+
+
 class Context(object):
     """
     Preprocess context. Contains the compile settings, error logging,
@@ -14,9 +26,11 @@ class Context(object):
     def __init__(self, path, loader=None, extra_options=None):
         self.loader = loader
 
+        # Remember stuff
         self.warnings = []
         self.template_dependencies = []
         self.media_dependencies = []
+        self.gettext_entries = []
 
         # Process options
         self.options = Options()
@@ -38,11 +52,16 @@ class Context(object):
         else:
             raise Exception('Preprocess context does not support template loading')
 
+    def remember_gettext(self, node, text):
+        self.gettext_entries.append(GettextEntry(node.path, node.line, node.column, text))
+
+
 
 class PreprocessWarning(Warning):
     def __init__(self, node, message):
         self.node = node
         self.message = message
+
 
 
 class Options(object):

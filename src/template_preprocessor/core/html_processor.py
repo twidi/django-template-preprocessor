@@ -929,7 +929,7 @@ def _check_external_file_existance(node, url):
             raise CompileException(node, 'Missing external static file (%s)' % url)
 
 
-def _compile_js_files(hash, media_files):
+def _compile_js_files(hash, media_files, context):
     from template_preprocessor.core.js_processor import compile_javascript_string
 
     if hash in __js_compiled:
@@ -939,7 +939,7 @@ def _compile_js_files(hash, media_files):
         # Compile script
             # 1. concatenate and compile all scripts
         source = u'\n'.join([
-                    compile_javascript_string(codecs.open(_get_media_source_from_url(p), 'r', 'utf-8').read(), p)
+                    compile_javascript_string(codecs.open(_get_media_source_from_url(p), 'r', 'utf-8').read(), context, p)
                     for p in media_files ])
 
             # 2. Store in media dir
@@ -953,7 +953,7 @@ def _compile_js_files(hash, media_files):
     return os.path.join(MEDIA_CACHE_URL, compiled_path)
 
 
-def _compile_css_files(hash, media_files):
+def _compile_css_files(hash, media_files, context):
     from template_preprocessor.core.css_processor import compile_css_string
 
     if hash in __css_compiled:
@@ -965,6 +965,7 @@ def _compile_css_files(hash, media_files):
         source = u'\n'.join([
                     compile_css_string(
                                 codecs.open(_get_media_source_from_url(p), 'r', 'utf-8').read(),
+                                context,
                                 os.path.join(MEDIA_ROOT, p),
                                 url=os.path.join(MEDIA_URL, p))
                     for p in media_files ])
@@ -996,7 +997,7 @@ def _merge_internal_css(tree):
     _merge_nodes_of_type(tree, HtmlStyleNode, dont_enter=[HtmlConditionalComment])
 
 
-def _pack_external_javascript(tree):
+def _pack_external_javascript(tree, context):
     """
     Pack external javascript code. (between {% compress %} and {% endcompress %})
     """
@@ -1022,7 +1023,7 @@ def _pack_external_javascript(tree):
 
             # Remember which media files were linked to this cache,
             # and compile the media files.
-            new_script_url = _compile_js_files(hash, scripts_in_pack)
+            new_script_url = _compile_js_files(hash, scripts_in_pack, context)
 
             # Replace the first external script's url by this one.
             # Remove all other external script files
@@ -1041,7 +1042,7 @@ def _pack_external_javascript(tree):
                             pack_tag.remove_child_nodes([script])
 
 
-def _pack_external_css(tree):
+def _pack_external_css(tree, context):
     """
     Pack external CSS code. (between {% compress %} and {% endcompress %})
     Replaces <link type="text/css" rel="stylesheet" media="..." />
@@ -1093,7 +1094,7 @@ def _pack_external_css(tree):
 
             # Remember which media files were linked to this cache,
             # and compile the media files.
-            new_css_url = _compile_css_files(hash, css_in_current_pack)
+            new_css_url = _compile_css_files(hash, css_in_current_pack, context)
 
             # Update URL for first external CSS node
             first_tag.set_html_attribute('href', new_css_url)
@@ -1190,11 +1191,11 @@ def _process_html_tree(tree, context):
 
     # Pack external Javascript
     if options.pack_external_javascript:
-        _pack_external_javascript(tree)
+        _pack_external_javascript(tree, context)
 
     # Pack external CSS
     if options.pack_external_css:
-        _pack_external_css(tree)
+        _pack_external_css(tree, context)
 
     # Compile javascript
     if options.compile_javascript:
@@ -1202,13 +1203,13 @@ def _process_html_tree(tree, context):
             if not js_node.is_external:
                 #print 'compiling'
                 #print js_node._print()
-                compile_javascript(js_node)
+                compile_javascript(js_node, context)
 
     # Compile CSS
     if options.compile_css:
         # Document-level CSS
         for css_node in tree.child_nodes_of_class([ HtmlStyleNode ]):
-            compile_css(css_node)
+            compile_css(css_node, context)
 
         # In-line CSS.
             # TODO: this would work, if attribute_value didn't contain the attribute quotes.

@@ -176,18 +176,18 @@ def _compress_css_whitespace(css_node):
     """
     for c in css_node.children:
         if isinstance(c, CssOperator):
-            # Whitespace tokens are required to be kept. e.g. between 'var' and the actual varname.
+            # Around operators, we can delete all whitespace.
             c.children = [ c.output_as_string().strip()  ]
 
         if isinstance(c, CssWhitespace):
-            # Around operators, we can delete all whitespace.
+            # Whitespace tokens to be kept. (but minified into one character.)
             c.children = [ u' ' ]
 
         if isinstance(c, Token):
             _compress_css_whitespace(c)
 
 
-def compile_css(css_node):
+def compile_css(css_node, context):
     """
     Compile the css nodes to more compact code.
     - Remove comments
@@ -201,7 +201,7 @@ def compile_css(css_node):
     _compress_css_whitespace(css_node)
 
 
-def compile_css_string(css_string, path='', url=None):
+def compile_css_string(css_string, context, path='', url=None):
     """
     Compile CSS code
     """

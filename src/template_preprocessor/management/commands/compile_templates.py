@@ -46,7 +46,8 @@ class Command(BaseCommand):
 
         self._errors = []
         if languages.sort() != options['languages'].sort():
-            print termcolor.colored('Warning: all template languages are deleted while we won\'t generate them again.', 'white', 'on_red')
+            print termcolor.colored('Warning: all template languages are deleted while we won\'t generate them again.',
+                                    'white', 'on_red')
 
         # Delete previously compiled templates
         # (This is to be sure that no template loaders were configured to
