@@ -631,7 +631,7 @@ def _validate_javascript(js_node):
             next()
 
 
-def _process_gettext(js_node, validate_only=False):
+def _process_gettext(js_node, context, validate_only=False):
     """
     Validate whether gettext(...) function in javascript get a string as
     parameter. (Or concatenation of several strings)
@@ -665,9 +665,14 @@ def _process_gettext(js_node, validate_only=False):
                             else:
                                 raise CompileException(node, 'Unexpected token inside gettext(...)')
 
+                        body = u''.join(body)
+
+                        # Remember gettext entry
+                        context.remember_gettext(gettext, body)
+
                         if not validate_only:
                             # Translate content
-                            translation = _(u''.join(body))
+                            translation = _(body)
 
                             # Replace gettext(...) call by its translation (in double quotes.)
                             gettext.__class__ = JavascriptDoubleQuotedString
@@ -676,6 +681,7 @@ def _process_gettext(js_node, validate_only=False):
                 except IndexError, i:
                     # i got out of the nodes array
                     pass
+
 
 
 def compile_javascript(js_node, context):
@@ -723,7 +729,7 @@ def _compile(js_node, context):
     _compress_javascript_whitespace(js_node)
 
     # Preprocess gettext
-    _process_gettext(js_node)
+    _process_gettext(js_node, context)
 
     # Minify variable names
     _minify_variable_names(js_node)
