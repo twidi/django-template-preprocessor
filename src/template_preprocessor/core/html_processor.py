@@ -707,8 +707,9 @@ def _validate_html_tags(tree):
     """
     for tag in tree.child_nodes_of_class([ HtmlTag ]):
         if tag.html_tagname not in __ALL_HTML_TAGS:
-            # Allow names <x:tagname />, this are data nodes.
-            if not tag.html_tagname.startswith('x:'):
+            # Ignore html tags in other namespaces:
+            # (Like e.g. <x:tagname />, <fb:like .../>)
+            if not ':' in tag.html_tagname:
                 raise CompileException(tag, 'Unknown HTML tag: <%s>' % tag.html_tagname)
 
 
@@ -717,33 +718,35 @@ def _validate_html_attributes(tree):
     Check whether HTML tags have no invalid or double attributes.
     """
     for tag in tree.child_nodes_of_class([ HtmlTag ]):
-        # Check for double attributes
-        attr_list=[]
+        # Ignore tags from other namespaces.
+        if not ':' in tag.html_tagname:
+            # Check for double attributes
+            attr_list=[]
 
-        if not len(list(tag.child_nodes_of_class([ DjangoTag ]))):
-            # TODO XXX:  {% if ... %} ... {% endif %} are not yet groupped in an DjangoIfNode, which means
-            # that the content of the if-block is still a child of the parent. For now, we simply
-            # don't check in these cases.
-            for a in tag.child_nodes_of_class([ HtmlTagAttribute ], dont_enter=[ DjangoTag ]):
-                if a.attribute_name in attr_list:
-                    raise CompileException(tag, 'Attribute "%s" defined more than once for <%s> tag' %
-                                    (a.attribute_name, tag.html_tagname))
-                attr_list.append(a.attribute_name)
+            if not len(list(tag.child_nodes_of_class([ DjangoTag ]))):
+                # TODO XXX:  {% if ... %} ... {% endif %} are not yet groupped in an DjangoIfNode, which means
+                # that the content of the if-block is still a child of the parent. For now, we simply
+                # don't check in these cases.
+                for a in tag.child_nodes_of_class([ HtmlTagAttribute ], dont_enter=[ DjangoTag ]):
+                    if a.attribute_name in attr_list:
+                        raise CompileException(tag, 'Attribute "%s" defined more than once for <%s> tag' %
+                                        (a.attribute_name, tag.html_tagname))
+                    attr_list.append(a.attribute_name)
 
-        # Check for invalid attributes
-        for a in tag.html_attributes:
-            if ':' in a:
-                # Don't validate tagnames from other namespaces.
-                continue
+            # Check for invalid attributes
+            for a in tag.html_attributes:
+                if ':' in a:
+                    # Don't validate tagnames from other namespaces.
+                    continue
 
-            elif a in __HTML_ATTRIBUTES['_']:
-                continue
+                elif a in __HTML_ATTRIBUTES['_']:
+                    continue
 
-            elif tag.html_tagname in __HTML_ATTRIBUTES and a in __HTML_ATTRIBUTES[tag.html_tagname]:
-                continue
+                elif tag.html_tagname in __HTML_ATTRIBUTES and a in __HTML_ATTRIBUTES[tag.html_tagname]:
+                    continue
 
-            else:
-                raise CompileException(tag, 'Invalid HTML attribute "%s" for <%s> tag' % (a, tag.html_tagname))
+                else:
+                    raise CompileException(tag, 'Invalid HTML attribute "%s" for <%s> tag' % (a, tag.html_tagname))
 
 
 def _ensure_type_in_scripts(tree):
@@ -802,7 +805,11 @@ def _nest_all_elements(tree):
     """
     Manipulate the parse tree by combining all opening and closing html nodes,
     to reflect the nesting of HTML nodes in the tree.
+    So where '<p>' and '</p>' where two independent simblings in the source three,
+    they become one now, and everything in between is considered a child of this tag.
     """
+    # NOTE: this does not yet combile unknown tags, like <fb:like/>,
+    #       maybe it's better to replace this code by a more dynamic approach.
     def _create_html_tag_node(name):
         class tag_node(HtmlNode):
             html_tagname = ''
@@ -862,7 +869,11 @@ def _check_no_block_level_html_in_inline_html(tree, options):
 
 def _check_for_unmatched_closing_html_tags(tree):
     for tag in tree.child_nodes_of_class([ HtmlEndTag ]):
-        raise CompileException(tag, 'Unmatched closing </%s> tag' % tag.html_tagname)
+        # NOTE: end tags may still exist for unknown namespaces because the
+        #       current implementation does not yet combile unknown start and
+        #       end tags.
+        if not ':' in tag.html_tagname:
+            raise CompileException(tag, 'Unmatched closing </%s> tag' % tag.html_tagname)
 
 
 # ==================================[  Advanced script/css manipulations ]================================
@@ -1021,7 +1032,8 @@ def _pack_external_javascript(tree):
                 # ! Note that we made a list of the child_nodes_of_class iterator,
                 #   this is required because we are removing childs from the list here.
                 if script.is_external:
-                    if script.script_source.startswith(MEDIA_URL):
+                    if ((MEDIA_URL and script.script_source.startswith(MEDIA_URL)) or
+                                (STATIC_URL and script.script_source.startswith(STATIC_URL))):
                         if first:
                             # Replace source
                             script.script_source = new_script_url

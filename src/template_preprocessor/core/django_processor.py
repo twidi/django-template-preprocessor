@@ -694,11 +694,15 @@ def _group_all_loads(tree):
 
     # Collect all {% load %} nodes.
     for load_tag in tree.child_nodes_of_class([ DjangoLoadTag ]):
-        if not first_load_tag:
-            first_load_tag = load_tag
+        # Keeps tags like {% load ssi from future %} as they are.
+        # Concatenating these is invalid.
+        if not ('from' in load_tag.output_as_string()  and 'future' in load_tag.output_as_string()):
+            # First tag
+            if not first_load_tag:
+                first_load_tag = load_tag
 
-        for l in load_tag.modules:
-            all_modules.add(l)
+            for l in load_tag.modules:
+                all_modules.add(l)
 
     # Remove all {% load %} nodes
     tree.remove_child_nodes_of_class(DjangoLoadTag)
@@ -921,7 +925,6 @@ def parse(source_code, path, context, main_template=False):
     tree = _process_extends(tree, context) # NOTE: this returns a new tree!
     _preprocess_includes(tree, context)
     _preprocess_decorate_tags(tree, context)
-
 
     # Following actions only need to be applied if this is the 'main' tree.
     # It does not make sense to apply it on every include, and then again
