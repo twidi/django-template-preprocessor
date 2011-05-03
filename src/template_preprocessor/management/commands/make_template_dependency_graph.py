@@ -27,10 +27,12 @@ class Command(BaseCommand):
     help = "Make dependency graph"
     option_list = BaseCommand.option_list + (
         make_option('--directory', action='append', dest='directory', help='Template directory (all templates if none is given)'),
+        make_option('--exclude', action='append', dest='exclude_directory', help='Exclude template directory'),
     )
 
     def handle(self, *args, **options):
         directory = (options.get('directory', ['']) or [''])[0]
+        exclude_directory = (options.get('exclude_directory', []) or [])
 
         g = Graph('Template dependencies', True)
 
@@ -38,10 +40,15 @@ class Command(BaseCommand):
         g.landscape = True
         g.rotate = 90
         g.label = str(datetime.datetime.now())
-        g.overlap = 'scale'
         #g.scale = 0.7
         #g.overlap = 'prism'
+        #g.overlap = False
+        g.overlap = 'scale'
+        g.ranksep = 1.8
+        g.overlap = 'compress'
         g.ratio = 1. / math.sqrt(2)
+        g.sep = 0.1
+        g.mindist = 0.1
 
         nodes = set()
         edges = [ ]
@@ -49,7 +56,7 @@ class Command(BaseCommand):
 
         # Retreive all nodes/edges
         for dir, t in template_iterator():
-            if t.startswith(directory):
+            if t.startswith(directory) and not any([ t.startswith(x) for x in exclude_directory ]):
                 nodes.add(t)
 
                 # {% include "..." %}
@@ -94,7 +101,7 @@ class Command(BaseCommand):
             edge = g.add_edge(node_a, node_b)
             edge.color = 'black'
             edge.arrowhead = 'normal'
-            edge.arrowsize = .5
+            edge.arrowsize = 1.1
             if is_extends:
                 edge.style = 'solid'
             else:
@@ -112,13 +119,13 @@ class Command(BaseCommand):
         `nodes`, return the existing.
         """
         if template not in nodes:
-            node = graph.add_node(template.replace('/', '\n').encode('utf-8')[-8:])
+            node = graph.add_node(template.replace('/', '/\n').encode('utf-8'))
             node.shape = 'rect'
-            node.label = template.replace('/', '\n').encode('utf-8')
-            node.fontsize = 12
+            node.label = template.replace('/', '/\n').encode('utf-8')
+            node.fontsize = 11
             node.fixedsize = False
-            node.width = 0.08
-            node.height = 0.08
+            node.width = 1.0
+            node.height = 0.8
             node.fontcolor = 'black'
 
 
