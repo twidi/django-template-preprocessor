@@ -145,9 +145,21 @@ class Command(BaseCommand):
                 open(output_path, 'a').write(template + '\n')
 
         # Dependencies
-        output_path = self._make_output_path(lang, template) + '-depends-on'
+        output_path = self._make_output_path(lang, template) + '-c-depends-on'
         open(output_path, 'w').write('\n'.join(dependency_list) + '\n')
 
+    def _save_first_level_template_dependencies(self, lang, template, include_list, extends_list):
+        """
+        First level dependencies (used for generating dependecy graphs)
+        (This doesn't contain the indirect dependencies.)
+        """
+        # {% include "..." %}
+        output_path = self._make_output_path(lang, template) + '-c-includes'
+        open(output_path, 'w').write('\n'.join(include_list) + '\n')
+
+        # {% extends "..." %}
+        output_path = self._make_output_path(lang, template) + '-c-extends'
+        open(output_path, 'w').write('\n'.join(extends_list) + '\n')
 
     def _compile_template(self, lang, template, input_path, output_path, no_html=False):
         try:
@@ -170,6 +182,8 @@ class Command(BaseCommand):
 
             # store dependencies
             self._save_template_dependencies(lang, template, context.template_dependencies)
+            self._save_first_level_template_dependencies(lang, template, context.include_dependencies,
+                                                                context.extends_dependencies)
 
             # Open output file
             codecs.open(output_path, 'w', 'utf-8').write(output)

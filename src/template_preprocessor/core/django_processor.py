@@ -608,6 +608,15 @@ def apply_method_on_parse_tree(tree, class_, method, *args, **kwargs):
             apply_method_on_parse_tree(c, class_, method, *args, **kwargs)
 
 
+def _find_first_level_dependencies(tree, context):
+    for node in tree.child_nodes_of_class([ DjangoIncludeTag, DjangoExtendsTag ]):
+        if isinstance(node, DjangoExtendsTag):
+            context.remember_extends(node.template_name)
+
+        if isinstance(node, DjangoIncludeTag):
+            context.remember_include(node.template_name)
+
+
 def _process_extends(tree, context):
     """
     {% extends ... %}
@@ -969,6 +978,9 @@ def parse(source_code, path, context, main_template=False):
     nest_block_level_elements(tree, __DJANGO_BLOCK_ELEMENTS, [DjangoTag], lambda c: c.tagname)
 
     # === Actions ===
+
+    if main_template:
+        _find_first_level_dependencies(tree, context)
 
     # Extend parent template and process includes
     tree = _process_extends(tree, context) # NOTE: this returns a new tree!

@@ -28,9 +28,16 @@ class Context(object):
 
         # Remember stuff
         self.warnings = []
-        self.template_dependencies = []
         self.media_dependencies = []
         self.gettext_entries = []
+
+        # template_dependencies: will contains all other templates which are
+        # needed for compilation of this template.
+        self.template_dependencies = []
+
+        # Only direct dependencies (first level {% include %} and {% extends %})
+        self.include_dependencies = []
+        self.extends_dependencies = []
 
         # Process options
         self.options = Options()
@@ -55,6 +62,11 @@ class Context(object):
     def remember_gettext(self, node, text):
         self.gettext_entries.append(GettextEntry(node.path, node.line, node.column, text))
 
+    def remember_include(self, template):
+        self.include_dependencies.append(template)
+
+    def remember_extends(self, template):
+        self.extends_dependencies.append(template)
 
 
 class PreprocessWarning(Warning):
