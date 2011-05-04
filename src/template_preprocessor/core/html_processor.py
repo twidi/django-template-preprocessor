@@ -71,8 +71,8 @@ __HTML_ATTRIBUTES = {
 __HTML_STATES = {
     'root' : State(
             # conditional comments
-            State.Transition(r'<!--\[if', (StartToken('html-start-conditional-comment'), Record(), Shift(), Push('conditional-comment'), )),
-            State.Transition(r'<!\[endif\]-->', (StartToken('html-end-conditional-comment'), Record(), Shift(), StopToken(), )),
+            State.Transition(r'<!(--)?\[if', (StartToken('html-start-conditional-comment'), Record(), Shift(), Push('conditional-comment'), )),
+            State.Transition(r'<!(--)?\[endif\](--)?>', (StartToken('html-end-conditional-comment'), Record(), Shift(), StopToken(), )),
             State.Transition(r'<!\[CDATA\[', (StartToken('html-cdata'), Shift(), Push('cdata'), )),
 
             # XML doctype
@@ -96,9 +96,8 @@ __HTML_STATES = {
             State.Transition(r'.|\s', (Error('Parse error in HTML document'), )),
             ),
     'conditional-comment': State(
-            State.Transition(r'[\s\w]+', (Record(), Shift(), )),
-            State.Transition(r'\]>', (Record(), Shift(), Pop(), StopToken(), )),
-
+            State.Transition(r'[\s\w()!|&]+', (Record(), Shift(), )),
+            State.Transition(r'\](--)?>', (Record(), Shift(), Pop(), StopToken(), )),
             State.Transition(r'.|\s', (Error('Parse error in Conditional Comment'), )),
             ),
     'comment': State(
