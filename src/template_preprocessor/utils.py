@@ -143,8 +143,10 @@ def execute_precompile_command():
     For instance, for compiling CSCC files to CSS first.
 
     -- settings.py --
-    def TEMPLATE_PREPROCESSOR_PRECOMPILE_COMMAND():
-        import os
-        os.system('cd %s; compass compile -c config.rb -q' % ('....path...'))
+    TEMPLATE_PREPROCESSOR_PRECOMPILE_COMMAND = 'cd %s; compass compile -c config.rb -q' % ('....path...'))
     """
-    getattr(settings, 'TEMPLATE_PREPROCESSOR_PRECOMPILE_COMMAND', lambda:None)()
+    command = getattr(settings, 'TEMPLATE_PREPROCESSOR_PRECOMPILE_COMMAND', None)
+
+    if command:
+        import os
+        os.system(command)

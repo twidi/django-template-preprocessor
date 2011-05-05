@@ -136,10 +136,6 @@ class ValidatorLoader(_Base):
         #                  load_template again for every include node where of
         #                  course the validation may fail. (incomplete HTML
         #                  tree, maybe only javascript, etc...)
-
-        # Precompile command
-        execute_precompile_command()
-
         # Load template
         template, origin = self.find_template(template_name, template_dirs)
 
@@ -149,7 +145,10 @@ class ValidatorLoader(_Base):
             # runtime call from an IncludeNode or ExtendsNode.
             import inspect
             if not any(map(lambda i:'render' == i[3], inspect.getouterframes(inspect.currentframe()))):
-                #print 'compiling %s' % template_name
+                # Precompile command
+                print 'compiling %s' % template_name
+                execute_precompile_command()
+
                 compile(template, loader = lambda path: self.find_template(path)[0], path=template_name,
                             options=get_options_for_path(origin.name))
         except Exception, e:
