@@ -15,8 +15,7 @@ from template_preprocessor.core import compile
 from template_preprocessor.core.lexer import CompileException
 
 from template_preprocessor.utils import language, template_iterator, load_template_source, get_template_path
-from template_preprocessor.utils import get_options_for_path
-
+from template_preprocessor.utils import get_options_for_path, execute_precompile_command
 
 
 class Command(BaseCommand):
@@ -60,8 +59,13 @@ class Command(BaseCommand):
                         print ('Deleting old template: %s' % path)
                     os.remove(path)
 
+        # Build compile queue
         queue = self._build_compile_queue(options['languages'], all_templates)
 
+        # Precompile command
+        execute_precompile_command()
+
+        # Compile queue
         for i in range(0, len(queue)):
             lang = queue[i][0]
             with language(lang):

@@ -12,7 +12,7 @@ from django.utils.importlib import import_module
 from django.template import StringOrigin
 
 from template_preprocessor.core import compile
-from template_preprocessor.utils import get_options_for_path
+from template_preprocessor.utils import get_options_for_path, execute_precompile_command
 
 import os
 import codecs
@@ -104,6 +104,9 @@ class RuntimeProcessedLoader(_Base):
     def load_template(self, template_name, template_dirs=None):
         template, origin = self.find_template(template_name, template_dirs)
 
+        # Precompile command
+        execute_precompile_command()
+
         # Compile template (we shouldn't compile anything at runtime.)
         template, context = compile(template, path=template_name, loader = lambda path: self.find_template(path)[0],
                         options=get_options_for_path(origin.name))
@@ -134,6 +137,9 @@ class ValidatorLoader(_Base):
         #                  course the validation may fail. (incomplete HTML
         #                  tree, maybe only javascript, etc...)
 
+        # Precompile command
+        execute_precompile_command()
+
         # Load template
         template, origin = self.find_template(template_name, template_dirs)
 
@@ -147,6 +153,7 @@ class ValidatorLoader(_Base):
                 compile(template, loader = lambda path: self.find_template(path)[0], path=template_name,
                             options=get_options_for_path(origin.name))
         except Exception, e:
+            # Print exception on console
             print '---'
             print 'Template: %s' % template_name
             print e

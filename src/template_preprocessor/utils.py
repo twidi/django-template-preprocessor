@@ -135,3 +135,16 @@ def get_options_for_app(app):
                 raise Exception('Configuration error in settings.TEMPLATE_PREPROCESSOR_OPTIONS')
 
     return result
+
+
+def execute_precompile_command():
+    """
+    Execute precompile command before compiling templates.
+    For instance, for compiling CSCC files to CSS first.
+
+    -- settings.py --
+    def TEMPLATE_PREPROCESSOR_PRECOMPILE_COMMAND():
+        import os
+        os.system('cd %s; compass compile -c config.rb -q' % ('....path...'))
+    """
+    getattr(settings, 'TEMPLATE_PREPROCESSOR_PRECOMPILE_COMMAND', lambda:None)()

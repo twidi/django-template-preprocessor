@@ -364,7 +364,7 @@ class DjangoBlocktransTag(Token):
                         plural = True
                     elif isinstance(n, DjangoVariable):
                         (plural_string if plural else string).append(convert_var(n.varname))
-                        (plural_variables if plural else variables).append(convert_var(n.varname))
+                        (plural_variables if plural else variables).append(n.varname)
                     elif isinstance(n, DjangoContent):
                         (plural_string if plural else string).append(n.output_as_string())
                     else:
@@ -836,6 +836,8 @@ def _preprocess_trans_tags(tree):
         def init(self, translated_text):
             self.children = [ translated_text ]
 
+    convert_var = lambda v: '%%(%s)s' % v
+
     for trans in tree.child_nodes_of_class([ DjangoTransTag, DjangoBlocktransTag ]):
         # Process {% blocktrans %}
         if isinstance(trans, DjangoBlocktransTag):
@@ -848,19 +850,19 @@ def _preprocess_trans_tags(tree):
 
             # Replace %(variable)s in translated strings by {{ variable }}
             for v in translation_info.variables:
-                if v in string:
-                    string = string.replace(v, '{{%s}}' % v)
+                if convert_var(v) in string:
+                    string = string.replace(convert_var(v), '{{%s}}' % v)
                 else:
                     raise CompileException(trans,
-                            'Could not find variable "%s" in {%% blocktrans %%} after translating.' % v)
+                            'Could not find variable "%s" in {%% blocktrans %%} "%s" after translating.' % (v, string))
 
             if translation_info.has_plural:
                 for v in translation_info.plural_variables:
-                    if v in plural_string:
-                        plural_string = plural_string.replace(v, '{{%s}}' % v)
+                    if convert_var(v) in plural_string:
+                        plural_string = plural_string.replace(convert_var(v), '{{%s}}' % v)
                     else:
                         raise CompileException(trans,
-                                'Could not find variable "%s" in {%% blocktrans %%} after translating.' % v)
+                                'Could not find variable "%s" in {%% blocktrans %%} "%s" after translating.' % (v, plural_string))
 
             # Wrap in {% if test %} for plural checking and in {% with test for passing parameters %}
             if translation_info.has_plural:
