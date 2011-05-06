@@ -29,11 +29,11 @@ __HTML4_INLINE_LEVEL_ELEMENTS = ('address', 'span', 'a', 'b', 'i', 'em', 'del', 
 
 # HTML 5 tags
 __HTML5_BLOCK_LEVEL_ELEMENTS = ( 'article', 'aside', 'canvas', 'figcaption', 'figure', 'footer', 'header', 'hgroup', 'output', 'progress', 'section', 'video', )
-__HTML5_INLINE_LEVEL_ELEMENTS = ('audio', 'details', 'command', 'datalist', 'mark', 'meter', 'nav', 'source', 'summary', 'time', 'samp', ),
+__HTML5_INLINE_LEVEL_ELEMENTS = ('audio', 'details', 'command', 'datalist', 'mark', 'meter', 'nav', 'source', 'summary', 'time', 'samp', )
 
 # All HTML tags
 __HTML_BLOCK_LEVEL_ELEMENTS = __HTML4_BLOCK_LEVEL_ELEMENTS + __HTML5_BLOCK_LEVEL_ELEMENTS
-__HTML_INLINE_BLOCK_ELEMENTS = __HTML4_INLINE_LEVEL_ELEMENTS + __HTML5_INLINE_LEVEL_ELEMENTS
+__HTML_INLINE_LEVEL_ELEMENTS = __HTML4_INLINE_LEVEL_ELEMENTS + __HTML5_INLINE_LEVEL_ELEMENTS
 
 
 # Following tags are also listed as block elements, but this list can only contain inline-elements.
