@@ -16,6 +16,8 @@ from template_preprocessor.core.lexer import CompileException
 
 from template_preprocessor.utils import language, template_iterator, load_template_source, get_template_path
 from template_preprocessor.utils import get_options_for_path, execute_precompile_command
+from template_preprocessor.core.utils import need_to_be_recompiled, create_media_output_path
+from template_preprocessor.core.context import Context
 
 
 class Command(BaseCommand):
@@ -56,7 +58,7 @@ class Command(BaseCommand):
             print self.colored('Warning: all template languages are deleted while we won\'t generate them again.',
                                     'white', 'on_red')
 
-        # Delete previously compiled templates
+        # Delete previously compiled templates and media files
         # (This is to be sure that no template loaders were configured to
         # load files from this cache.)
         if all_templates:
@@ -65,6 +67,13 @@ class Command(BaseCommand):
                     path = os.path.join(root, f)
                     if self.verbosity >= 1:
                         print ('Deleting old template: %s' % path)
+                    os.remove(path)
+
+            for root, dirs, files in os.walk(settings.MEDIA_CACHE_DIR):
+                for f in files:
+                    path = os.path.join(root, f)
+                    if self.verbosity >= 1:
+                        print ('Deleting old media file: %s' % path)
                     os.remove(path)
 
         # Build compile queue
@@ -86,6 +95,23 @@ class Command(BaseCommand):
 
         # Show all errors once again.
         print u'\n*** %i Files processed, %i compile errors ***' % (len(queue), len(self._errors))
+
+        # Build media compile queue
+        media_queue = self._build_compile_media_queue(options['languages'])
+
+        # Compile media queue
+        self._errors = []
+        for i in range(0, len(media_queue)):
+            lang = media_queue[i][0]
+            with language(lang):
+                if self.verbosity >= 2:
+                    print self.colored('%i / %i |' % (i, len(media_queue)), 'yellow'),
+                    print self.colored('(%s)' % lang, 'yellow'),
+                    print self.colored(','.join(media_queue[i][1]), 'green')
+                self._compile_media(*media_queue[i])
+
+        # Show all errors once again.
+        print u'\n*** %i Media files processed, %i compile errors ***' % (len(media_queue), len(self._errors))
 
 
     def _build_compile_queue(self, languages, all_templates=True):
@@ -133,6 +159,38 @@ class Command(BaseCommand):
         queue = list(queue)
         queue.sort()
         return queue
+
+
+    def _build_compile_media_queue(self, languages):
+        from template_preprocessor.core.utils import compile_external_css_files, compile_external_javascript_files
+
+        queue = []
+        for root, dirs, files in os.walk(settings.MEDIA_CACHE_DIR):
+            for f in files:
+                if f.endswith('-c-meta'):
+                    input_files = open(os.path.join(root, f), 'r').read().split('\n')
+                    output_file = f[:-len('-c-meta')]
+                    lang = os.path.split(root)[-1]
+
+                    if output_file.endswith('.js'):
+                        extension = 'js'
+                        compiler = compile_external_javascript_files
+                    elif output_file.endswith('.css'):
+                        extension = 'css'
+                        compiler = compile_external_css_files
+                    else:
+                        extension = None
+
+                    if extension and need_to_be_recompiled(input_files, create_media_output_path(input_files, extension, lang)):
+                        queue.append((lang, input_files, compiler))
+
+        queue.sort()
+        return queue
+
+
+    def _compile_media(self, lang, input_urls, compiler):
+        context = Context('External media: ' + ','.join(input_urls))
+        compiler(input_urls, context)
 
 
     def _make_output_path(self, language, template):

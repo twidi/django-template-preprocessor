@@ -15,12 +15,12 @@ Parses HTML in de parse tree. (between django template tags.)
 from template_preprocessor.core.django_processor import *
 from template_preprocessor.core.lexer import State, StartToken, Push, Record, Shift, StopToken, Pop, CompileException, Token, Error
 from template_preprocessor.core.lexer_engine import tokenize, nest_block_level_elements
+from template_preprocessor.core.utils import check_external_file_existance
 import string
 import codecs
 import os
 from copy import deepcopy
 from django.conf import settings
-from hashlib import md5
 
 
 # HTML 4 tags
@@ -902,99 +902,8 @@ from template_preprocessor.core.js_processor import compile_javascript
 import codecs
 import os
 
-__js_compiled = { }
-__css_compiled = { }
-
-MEDIA_ROOT = settings.MEDIA_ROOT
 MEDIA_URL = settings.MEDIA_URL
-MEDIA_CACHE_DIR = settings.MEDIA_CACHE_DIR
-MEDIA_CACHE_URL = settings.MEDIA_CACHE_URL
 STATIC_URL = getattr(settings, 'STATIC_URL', '')
-
-
-def _create_directory_if_not_exists(directory):
-    if not os.path.exists(directory):
-        os.mkdir(directory)
-
-
-def _get_media_source_from_url(url):
-    """
-    For a given media/static URL, return the matching full path in the media/static directory
-    """
-    if MEDIA_URL and url.startswith(MEDIA_URL):
-        return os.path.join(MEDIA_ROOT, url[len(MEDIA_URL):].lstrip('/'))
-
-    elif STATIC_URL and url.startswith(STATIC_URL):
-        from django.contrib.staticfiles.finders import find
-        path = url[len(STATIC_URL):].lstrip('/')
-        return find(path)
-
-
-def _check_external_file_existance(node, url):
-    """
-    Check whether we have a matching file in our media/static directory for this URL.
-    Raise exception if we don't.
-    """
-    complete_path = _get_media_source_from_url(url)
-
-    if not complete_path or not os.path.exists(complete_path):
-        if MEDIA_URL and url.startswith(MEDIA_URL):
-            raise CompileException(node, 'Missing external media file (%s)' % url)
-
-        elif STATIC_URL and url.startswith(STATIC_URL):
-            raise CompileException(node, 'Missing external static file (%s)' % url)
-
-
-def _compile_js_files(hash, media_files, context):
-    from template_preprocessor.core.js_processor import compile_javascript_string
-
-    if hash in __js_compiled:
-        compiled_path = __js_compiled[hash]
-    else:
-        print 'Compiling media: ', ', '.join(media_files)
-        # Compile script
-            # 1. concatenate and compile all scripts
-        source = u'\n'.join([
-                    compile_javascript_string(codecs.open(_get_media_source_from_url(p), 'r', 'utf-8').read(), context, p)
-                    for p in media_files ])
-
-            # 2. Store in media dir
-        compiled_path = '%s.js' % hash
-        _create_directory_if_not_exists(MEDIA_CACHE_DIR)
-        codecs.open(os.path.join(MEDIA_CACHE_DIR, compiled_path), 'w', 'utf-8').write(source)
-
-        # Save
-        __js_compiled[hash] = compiled_path
-
-    return os.path.join(MEDIA_CACHE_URL, compiled_path)
-
-
-def _compile_css_files(hash, media_files, context):
-    from template_preprocessor.core.css_processor import compile_css_string
-
-    if hash in __css_compiled:
-        compiled_path = __css_compiled[hash]
-    else:
-        print 'Compiling media: ', ', '.join(media_files)
-        # Compile CSS
-            # 1. concatenate and compile all css files
-        source = u'\n'.join([
-                    compile_css_string(
-                                codecs.open(_get_media_source_from_url(p), 'r', 'utf-8').read(),
-                                context,
-                                os.path.join(MEDIA_ROOT, p),
-                                url=os.path.join(MEDIA_URL, p))
-                    for p in media_files ])
-
-            # 2. Store in media dir
-        compiled_path = '%s.css' % hash
-        _create_directory_if_not_exists(MEDIA_CACHE_DIR)
-        codecs.open(os.path.join(MEDIA_CACHE_DIR, compiled_path), 'w', 'utf-8').write(source)
-
-        # Save
-        __css_compiled[hash] = compiled_path
-
-    return os.path.join(MEDIA_CACHE_URL, compiled_path)
 
 
 
@@ -1029,17 +938,12 @@ def _pack_external_javascript(tree, context):
                 if (MEDIA_URL and source.startswith(MEDIA_URL)) or (STATIC_URL and source.startswith(STATIC_URL)):
                     # Add to list
                     scripts_in_pack.append(source)
-                    _check_external_file_existance(script, source)
+                    check_external_file_existance(script, source)
 
         if scripts_in_pack:
-            # Create a hash for all the scriptnames
-            # And remember in cache
-            scripts_in_pack = tuple(scripts_in_pack) # tuples are hashable
-            hash = md5(''.join(scripts_in_pack)).hexdigest()
-
             # Remember which media files were linked to this cache,
             # and compile the media files.
-            new_script_url = _compile_js_files(hash, scripts_in_pack, context)
+            new_script_url = context.compile_js_files(scripts_in_pack)
 
             # Replace the first external script's url by this one.
             # Remove all other external script files
@@ -1083,7 +987,7 @@ def _pack_external_css(tree, context):
                 if (MEDIA_URL and source.startswith(MEDIA_URL)) or (STATIC_URL and source.startswith(STATIC_URL)):
                     # Add to list
                     css_in_pack.append( { 'tag': tag, 'source': source } )
-                    _check_external_file_existance(tag, source)
+                    check_external_file_existance(tag, source)
 
         # Group CSS only when they have the same 'media' attribute value
         while css_in_pack:
@@ -1103,14 +1007,9 @@ def _pack_external_css(tree, context):
                 css_in_current_pack.append(css_in_pack[0]['source'])
                 css_in_pack = css_in_pack[1:]
 
-            # Create a hash for all concecutive CSS files with the same media attribute
-            # And remember in cache
-            css_in_current_pack = tuple(css_in_current_pack) # tuples are hashable
-            hash = md5(''.join(css_in_current_pack)).hexdigest()
-
             # Remember which media files were linked to this cache,
             # and compile the media files.
-            new_css_url = _compile_css_files(hash, css_in_current_pack, context)
+            new_css_url = context.compile_css_files(css_in_current_pack)
 
             # Update URL for first external CSS node
             first_tag.set_html_attribute('href', new_css_url)

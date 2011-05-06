@@ -5,6 +5,10 @@ Django template preprocessor.
 Author: Jonathan Slenders, City Live
 """
 from template_preprocessor.core.lexer import CompileException
+import os
+
+from template_preprocessor.core.utils import compile_external_javascript_files, compile_external_css_files
+
 
 class GettextEntry(object):
     def __init__(self, path, line, column, text):
@@ -67,6 +71,21 @@ class Context(object):
 
     def remember_extends(self, template):
         self.extends_dependencies.append(template)
+
+    # What to do with media files
+
+    def compile_js_files(self, media_files):
+        def callback():
+            print 'Compiling media: ', ', '.join(media_files)
+
+        return compile_external_javascript_files(media_files, self, callback)
+
+    def compile_css_files(self, media_files):
+        def callback():
+            print 'Compiling media: ', ', '.join(media_files)
+
+        return compile_external_css_files(media_files, self, callback)
+
 
 
 class PreprocessWarning(Warning):
