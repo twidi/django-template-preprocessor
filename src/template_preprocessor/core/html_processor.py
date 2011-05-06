@@ -23,15 +23,27 @@ from django.conf import settings
 from hashlib import md5
 
 
-__HTML_BLOCK_LEVEL_ELEMENTS = ('html', 'head', 'body', 'meta', 'script', 'noscript', 'p', 'div', 'ul', 'ol', 'dl', 'dt', 'dd', 'li', 'table', 'td', 'tr', 'th', 'thead', 'tfoot', 'tbody', 'br', 'link', 'title', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'form', 'object', 'base', 'iframe', 'fieldset', 'code', 'blockquote', 'legend', 'pre', 'fb:like',) # TODO: complete
-__HTML_INLINE_LEVEL_ELEMENTS = ('span', 'a', 'b', 'i', 'em', 'del', 'ins', 'strong', 'select', 'label', 'q', 'sub', 'sup', 'small', 'sub', 'sup', 'option', 'abbr', 'img', 'input', 'hr', 'param', 'button', 'caption', 'style', 'textarea', 'colgroup', 'col', 'samp' )
+# HTML 4 tags
+__HTML4_BLOCK_LEVEL_ELEMENTS = ('html', 'head', 'body', 'meta', 'script', 'noscript', 'p', 'div', 'ul', 'ol', 'dl', 'dt', 'dd', 'li', 'table', 'td', 'tr', 'th', 'thead', 'tfoot', 'tbody', 'br', 'link', 'title', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'form', 'object', 'base', 'iframe', 'fieldset', 'code', 'blockquote', 'legend', 'pre', 'embed')
+__HTML4_INLINE_LEVEL_ELEMENTS = ('address', 'span', 'a', 'b', 'i', 'em', 'del', 'ins', 'strong', 'select', 'label', 'q', 'sub', 'sup', 'small', 'sub', 'sup', 'option', 'abbr', 'img', 'input', 'hr', 'param', 'button', 'caption', 'style', 'textarea', 'colgroup', 'col', 'samp', 'kbd', 'map', 'optgroup', 'strike', 'var', 'wbr', 'dfn')
 
-    # TODO: 'img', 'object' 'button', 'td' and 'th' are inline-block
+# HTML 5 tags
+__HTML5_BLOCK_LEVEL_ELEMENTS = ( 'article', 'aside', 'canvas', 'figcaption', 'figure', 'footer', 'header', 'hgroup', 'output', 'progress', 'section', 'video', )
+__HTML5_INLINE_LEVEL_ELEMENTS = ('audio', 'details', 'command', 'datalist', 'mark', 'meter', 'nav', 'source', 'summary', 'time', 'samp', ),
+
+# All HTML tags
+__HTML_BLOCK_LEVEL_ELEMENTS = __HTML4_BLOCK_LEVEL_ELEMENTS + __HTML5_BLOCK_LEVEL_ELEMENTS
+__HTML_INLINE_BLOCK_ELEMENTS = __HTML4_INLINE_LEVEL_ELEMENTS + __HTML5_INLINE_LEVEL_ELEMENTS
+
+
+# Following tags are also listed as block elements, but this list can only contain inline-elements.
+__HTML_INLINE_BLOCK_ELEMENTS = ('h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'img', 'object', 'button')
+
 
         # HTML tags consisting of separate open and close tag.
 __ALL_HTML_TAGS = __HTML_BLOCK_LEVEL_ELEMENTS + __HTML_INLINE_LEVEL_ELEMENTS
 
-__DEPRECATED_HTML_TAGS = ('i', 'b', 'u' )
+__DEPRECATED_HTML_TAGS = ('i', 'b', 'u', 'tt', 'strike', )
 
 __HTML_ATTRIBUTES = {
     # Valid for every HTML tag
@@ -62,7 +74,6 @@ __HTML_ATTRIBUTES = {
     'table': ('cellpadding', 'cellspacing', 'summary', 'width', ),
     'p': ('align', ), # Deprecated
     'embed': ('src', 'allowscriptaccess', 'height', 'width', 'allowfullscreen', 'type', ),
-    'fb:like': ('href', 'show_faces', 'width', 'font', 'action', ),
 }
 
 # TODO: check whether forms have {% csrf_token %}
@@ -734,8 +745,8 @@ def _validate_html_attributes(tree):
 
             # Check for invalid attributes
             for a in tag.html_attributes:
-                if ':' in a:
-                    # Don't validate tagnames from other namespaces.
+                if ':' in a or a.startswith('data-'):
+                    # Don't validate tagnames from other namespaces, or HTML5 data- attributes
                     continue
 
                 elif a in __HTML_ATTRIBUTES['_']:
@@ -854,7 +865,7 @@ def _check_no_block_level_html_in_inline_html(tree, options):
 
                 if c.__class__.html_tagname in __HTML_INLINE_LEVEL_ELEMENTS:
                     check(c, c.__class__.html_tagname)
-                elif c.__class__.html_tagname in ('h1', 'h2', 'h3', 'h4', 'h5', 'h6'):
+                elif c.__class__.html_tagname in __HTML_INLINE_BLOCK_ELEMENTS:
                     # This are block level tags, but can only contain inline level elements,
                     # therefor, consider as in-line from now on.
                     check(c, c.__class__.html_tagname)
