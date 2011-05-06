@@ -47,9 +47,13 @@ __DEPRECATED_HTML_TAGS = ('i', 'b', 'u', 'tt', 'strike', )
 
 __HTML_ATTRIBUTES = {
     # Valid for every HTML tag
-    '_': ('id', 'class', 'style', 'lang', 'xmlns', 'title', 'xml:lang'),
+    '_': ('accesskey', 'id', 'class', 'contenteditable', 'contextmenu', 'dir', 'draggable', 'dropzone', 'hidden', 'spellcheck', 'style', 'tabindex', 'lang', 'xmlns', 'title', 'xml:lang'),
 
-    'a': ('href', 'target', 'rel', 'accesskey', 'name', 'share_url'), # share_url is not valid, but used in the facebook share snipped.
+    # Attributes for specific HTML tags
+
+    'a': ('href', 'hreflang', 'media', 'type', 'target', 'rel', 'name', 'share_url'), # share_url is not valid, but used in the facebook share snipped.
+    'audio': ('autoplay', 'controls', 'loop', 'preload', 'src'),
+    'canvas': ('height', 'width'),
     'font': ('face', 'size', ),
     'form': ('action', 'method', 'enctype', 'name', ),
     'html': ('xmlns', 'lang', 'dir', ),
@@ -69,11 +73,12 @@ __HTML_ATTRIBUTES = {
     'option': ('value', 'selected', ),
     'base': ('href', ),
     'object': ('data', 'type', 'width', 'height', 'quality', ),
-    'iframe': ('src', 'name', 'height', 'width', 'marginwidth', 'marginheight', 'scrolling', 'frameborder', 'allowTransparency',),
+    'iframe': ('src', 'srcdoc', 'name', 'height', 'width', 'marginwidth', 'marginheight', 'scrolling', 'sandbox', 'seamless', 'frameborder', 'allowTransparency',),
     'param': ('name', 'value', ),
     'table': ('cellpadding', 'cellspacing', 'summary', 'width', ),
     'p': ('align', ), # Deprecated
     'embed': ('src', 'allowscriptaccess', 'height', 'width', 'allowfullscreen', 'type', ),
+    'video': ('audio', 'autoplay', 'controls', 'height', 'loop', 'poster', 'preload', 'src', 'width'),
 }
 
 # TODO: check whether forms have {% csrf_token %}
