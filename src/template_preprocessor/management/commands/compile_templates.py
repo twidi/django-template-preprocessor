@@ -23,19 +23,27 @@ class Command(BaseCommand):
     option_list = BaseCommand.option_list + (
         make_option('--language', action='append', dest='languages', help='Give the languages'),
         make_option('--all', action='store_true', dest='all_templates', help='Compile all templates (instead of only the changed)'),
+        make_option('--boring', action='store_true', dest='boring', help='No colors in output'),
     )
 
+    def colored(self, text, *args, **kwargs):
+        if self.boring:
+            return text
+        else:
+            return termcolor.colored(text, *args, **kwargs)
 
     def print_error(self, text):
         self._errors.append(text)
-        print termcolor.colored(text, 'white', 'on_red')
-
+        print self.colored(text, 'white', 'on_red').encode('utf-8')
 
     def handle(self, *args, **options):
         all_templates = options['all_templates']
 
         # Default verbosity
         self.verbosity = int(options.get('verbosity', 1))
+
+        # Colors?
+        self.boring = bool(options.get('boring'))
 
         # All languages by default
         languages = [l[0] for l in settings.LANGUAGES]
@@ -45,7 +53,7 @@ class Command(BaseCommand):
 
         self._errors = []
         if languages.sort() != options['languages'].sort():
-            print termcolor.colored('Warning: all template languages are deleted while we won\'t generate them again.',
+            print self.colored('Warning: all template languages are deleted while we won\'t generate them again.',
                                     'white', 'on_red')
 
         # Delete previously compiled templates
@@ -70,9 +78,9 @@ class Command(BaseCommand):
             lang = queue[i][0]
             with language(lang):
                 if self.verbosity >= 2:
-                    print termcolor.colored('%i / %i |' % (i, len(queue)), 'yellow'),
-                    print termcolor.colored('(%s)' % lang, 'yellow'),
-                    print termcolor.colored(queue[i][1], 'green')
+                    print self.colored('%i / %i |' % (i, len(queue)), 'yellow'),
+                    print self.colored('(%s)' % lang, 'yellow'),
+                    print self.colored(queue[i][1], 'green')
 
                 self._compile_template(*queue[i])
 
