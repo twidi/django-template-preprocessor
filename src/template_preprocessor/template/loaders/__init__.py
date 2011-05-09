@@ -144,7 +144,7 @@ class ValidatorLoader(_Base):
             # Don't compile template when a parent frame was a 'render' method. Than it's probably a
             # runtime call from an IncludeNode or ExtendsNode.
             import inspect
-            if not any(map(lambda i:'render' == i[3], inspect.getouterframes(inspect.currentframe()))):
+            if not any(i[3] in ('render', 'do_include') for i in inspect.getouterframes(inspect.currentframe())):
                 # Precompile command
                 print 'compiling %s' % template_name
                 execute_precompile_command()
