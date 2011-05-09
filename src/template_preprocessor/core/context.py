@@ -101,16 +101,16 @@ class Options(object):
     """
     def __init__(self):
         # Default settings
-        self.whitespace_compression = True
+        self.execute_preprocessable_tags = True
+        self.merge_all_load_tags = True
+        self.preprocess_ifdebug = True # Should probably always be True
+        self.preprocess_macros = True
         self.preprocess_translations = True
         self.preprocess_urls = True
         self.preprocess_variables = True
         self.remove_block_tags = True # Should propably not be disabled
-        self.merge_all_load_tags = True
-        self.execute_preprocessable_tags = True
-        self.preprocess_macros = True
-        self.preprocess_ifdebug = True # Should probably always be True
         self.remove_some_tags = True # As we lack a better settings name
+        self.whitespace_compression = True
 
         # HTML processor settings
         self.is_html = True
@@ -131,22 +131,23 @@ class Options(object):
         Change an option. Called when the template contains a {% ! ... %} option tag.
         """
         actions = {
-            'whitespace-compression': ('whitespace_compression', True),
-            'no-whitespace-compression': ('whitespace_compression', False),
-            'merge-internal-javascript': ('merge_internal_javascript', True),
-            'merge-internal-css': ('merge_internal_css', True),
-            'html': ('is_html', True), # Enable HTML extensions
-            'no-html': ('is_html', False), # Disable all HTML specific options
-            'no-macro-preprocessing': ('preprocess_macros', False),
-            'html-remove-empty-class-attributes': ('remove_empty_class_attributes', True),
-            'pack-external-javascript': ('pack_external_javascript', True),
-            'pack-external-css': ('pack_external_css', True),
             'compile-css': ('compile_css', True),
             'compile-javascript': ('compile_javascript', True),
-            'validate-html': ('validate_html', True),
-            'no-validate-html': ('validate_html', False),
             'disallow-orphan-blocks': ('disallow_orphan_blocks', True),
+            'html': ('is_html', True), # Enable HTML extensions
+            'html-remove-empty-class-attributes': ('remove_empty_class_attributes', True),
+            'merge-internal-css': ('merge_internal_css', True),
+            'merge-internal-javascript': ('merge_internal_javascript', True),
             'no-disallow-orphan-blocks': ('disallow_orphan_blocks', False),
+            'no-html': ('is_html', False), # Disable all HTML specific options
+            'no-macro-preprocessing': ('preprocess_macros', False),
+            'no-i18n-preprocessing': ('preprocess_translations', False),
+            'no-validate-html': ('validate_html', False),
+            'no-whitespace-compression': ('whitespace_compression', False),
+            'pack-external-css': ('pack_external_css', True),
+            'pack-external-javascript': ('pack_external_javascript', True),
+            'validate-html': ('validate_html', True),
+            'whitespace-compression': ('whitespace_compression', True),
         }
 
         if value in actions:
