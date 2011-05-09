@@ -26,6 +26,8 @@ class Command(BaseCommand):
         make_option('--language', action='append', dest='languages', help='Give the languages'),
         make_option('--all', action='store_true', dest='all_templates', help='Compile all templates (instead of only the changed)'),
         make_option('--boring', action='store_true', dest='boring', help='No colors in output'),
+        make_option('--noinput', action='store_false', dest='interactive', default=True,
+                        help='Tell Django to NOT prompt the user for input of any kind.'),
     )
 
     def colored(self, text, *args, **kwargs):
@@ -40,6 +42,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         all_templates = options['all_templates']
+        interactive = options['interactive']
 
         # Default verbosity
         self.verbosity = int(options.get('verbosity', 1))
@@ -62,19 +65,25 @@ class Command(BaseCommand):
         # (This is to be sure that no template loaders were configured to
         # load files from this cache.)
         if all_templates:
-            for root, dirs, files in os.walk(settings.TEMPLATE_CACHE_DIR):
-                for f in files:
-                    path = os.path.join(root, f)
-                    if self.verbosity >= 1:
-                        print ('Deleting old template: %s' % path)
-                    os.remove(path)
+            if not interactive or raw_input('\nDelete all files in template cache directory: %s? [y/N] ' %
+                                settings.TEMPLATE_CACHE_DIR).lower() == 'y':
+                for root, dirs, files in os.walk(settings.TEMPLATE_CACHE_DIR):
+                    for f in files:
+                        if not f[0] == '.': # Skip hidden files
+                            path = os.path.join(root, f)
+                            if self.verbosity >= 1:
+                                print ('Deleting old template: %s' % path)
+                            os.remove(path)
 
-            for root, dirs, files in os.walk(settings.MEDIA_CACHE_DIR):
-                for f in files:
-                    path = os.path.join(root, f)
-                    if self.verbosity >= 1:
-                        print ('Deleting old media file: %s' % path)
-                    os.remove(path)
+            if not interactive or raw_input('\nDelete all files in media cache directory %s? [y/N] ' %
+                                settings.MEDIA_CACHE_DIR).lower() == 'y':
+                for root, dirs, files in os.walk(settings.MEDIA_CACHE_DIR):
+                    for f in files:
+                        if not f[0] == '.': # Skip hidden files
+                            path = os.path.join(root, f)
+                            if self.verbosity >= 1:
+                                print ('Deleting old media file: %s' % path)
+                            os.remove(path)
 
         # Build compile queue
         queue = self._build_compile_queue(options['languages'], all_templates)
