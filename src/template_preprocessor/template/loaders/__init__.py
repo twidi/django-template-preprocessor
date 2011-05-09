@@ -106,8 +106,9 @@ class RuntimeProcessedLoader(_Base):
 
         # Precompile command
         execute_precompile_command()
+        print 'compiling %s' % template_name
 
-        # Compile template (we shouldn't compile anything at runtime.)
+        # Compile template
         template, context = compile(template, path=template_name, loader = lambda path: self.find_template(path)[0],
                         options=get_options_for_path(origin.name))
 
