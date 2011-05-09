@@ -268,7 +268,6 @@ class JavascriptSingleQuotedString(JavascriptString):
             else:
                 handler(c)
 
-        handler(self.value.replace("'", r"\'"))
         handler(u"'")
 
 
