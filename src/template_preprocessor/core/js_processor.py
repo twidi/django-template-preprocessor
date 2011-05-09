@@ -141,6 +141,10 @@ class JavascriptParentheses(JavascriptNode):
         Token.output(self, handler)
         handler(u')')
 
+    @property
+    def contains_django_tags(self):
+        return any(self.child_nodes_of_class([DjangoTag]))
+
 
 class JavascriptSquareBrackets(JavascriptNode):
     """
@@ -227,22 +231,43 @@ class JavascriptString(JavascriptNode):
         """
         String value. Has still escaped special characters,
         but no escapes for quotes.
+
+        WARNING: Don't call this method when the string contains django tags,
+                 the output may be invalid.
         """
         return self.output_as_string(use_original_output_method=True)
+
+    @property
+    def contains_django_tags(self):
+        return any(self.child_nodes_of_class([DjangoTag]))
 
     def output(self, handler):
         raise Exception("Don't call output on abstract base class")
 
+
 class JavascriptDoubleQuotedString(JavascriptString):
     def output(self, handler):
         handler(u'"')
-        handler(self.value.replace('"', r'\"'))
+
+        for c in self.children:
+            if isinstance(c, basestring):
+                handler(c.replace('"', r'\"'))
+            else:
+                handler(c)
+
         handler(u'"')
 
 
 class JavascriptSingleQuotedString(JavascriptString):
     def output(self, handler):
         handler(u"'")
+
+        for c in self.children:
+            if isinstance(c, basestring):
+                handler(c.replace("'", r"\'"))
+            else:
+                handler(c)
+
         handler(self.value.replace("'", r"\'"))
         handler(u"'")
 
@@ -644,14 +669,14 @@ def _process_gettext(js_node, context, validate_only=False):
                 try:
                     gettext = nodes[i]
 
-                    # Test '('
+                    # Skip whitespace
                     i += 1
                     while isinstance(nodes[i], JavascriptWhiteSpace):
                         i += 1
 
                     # When gettext is followed by '()', this is a call to gettext, otherwise, gettext is used
                     # as a variable.
-                    if isinstance(nodes[i], JavascriptParentheses):
+                    if isinstance(nodes[i], JavascriptParentheses) and not nodes[i].contains_django_tags:
                         parentheses = nodes[i]
 
                         # Read content of gettext call.
