@@ -623,11 +623,14 @@ def _process_extends(tree, context):
     When this tree extends another template. Load the base template,
     compile it, merge the trees, and return a new tree.
     """
+    extends_tag = None
+
     try:
         base_tree = None
 
         for c in tree.children:
             if isinstance(c, DjangoExtendsTag) and not c.template_name_is_variable:
+                extends_tag = c
                 base_tree = context.load(c.template_name)
                 break
 
@@ -680,8 +683,9 @@ def _process_extends(tree, context):
             return tree
 
     except TemplateDoesNotExist, e:
-        print e
-        return tree
+        # It is required that the base template exists.
+        raise CompileException(extends_tag, 'Base template {%% extends "%s" %%} not found' %
+                    (extends_tag.template_name if extends_tag else "..."))
 
 
 def _preprocess_includes(tree, context):
