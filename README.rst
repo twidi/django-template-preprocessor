@@ -151,7 +151,8 @@ Additional recommendations
 
 ::
 
-    <script type="text/javascript">// <![CDATA[ 
+    <script type="text/javascript">
+        // <![CDATA[ 
         ...alert('<div>');
         // ]]>
     </script>
@@ -222,8 +223,8 @@ Extending the template preprocessor in your application.
 Custom template tags can also be preprocessed, if the output does not depend on
 context variables. It works as follows:
 
-Make a python module `preprocessable_template_tags.py` in your application folder,
-and make sure the application appears in settings.INSTALLED_APPS.
+Make a python module ``preprocessable_template_tags.py`` in your application folder,
+and make sure the application appears in ``settings.INSTALLED_APPS``.
 In this file, write template tags like:
 
 
