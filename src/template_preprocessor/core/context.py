@@ -140,8 +140,10 @@ class Options(object):
             'merge-internal-javascript': ('merge_internal_javascript', True),
             'no-disallow-orphan-blocks': ('disallow_orphan_blocks', False),
             'no-html': ('is_html', False), # Disable all HTML specific options
-            'no-macro-preprocessing': ('preprocess_macros', False),
             'no-i18n-preprocessing': ('preprocess_translations', False),
+            'no-macro-preprocessing': ('preprocess_macros', False),
+            'no-pack-external-css': ('pack_external_css', False),
+            'no-pack-external-javascript': ('pack_external_javascript', False),
             'no-validate-html': ('validate_html', False),
             'no-whitespace-compression': ('whitespace_compression', False),
             'pack-external-css': ('pack_external_css', True),

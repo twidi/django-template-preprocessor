@@ -1016,11 +1016,17 @@ def parse(source_code, path, context, main_template=False):
 
         # Do variable lookups
         if options.preprocess_variables:
-            from django.contrib.sites.models import Site
+            sites_enabled = 'django.contrib.sites' in settings.INSTALLED_APPS
+
             _preprocess_variables(tree,
                         {
                             'MEDIA_URL': getattr(settings, 'MEDIA_URL', ''),
                             'STATIC_URL': getattr(settings, 'STATIC_URL', ''),
+                        })
+            if sites_enabled:
+                from django.contrib.sites.models import Site
+                _preprocess_variables(tree,
+                        {
                             'SITE_DOMAIN': Site.objects.get_current().domain,
                             'SITE_NAME': Site.objects.get_current().name,
                             'SITE_URL': 'http://%s' % Site.objects.get_current().domain,
