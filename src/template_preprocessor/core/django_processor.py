@@ -19,7 +19,7 @@ from django.core.urlresolvers import NoReverseMatch
 from django.core.urlresolvers import reverse
 
 from template_preprocessor.core.lexer import Token, State, StartToken, Shift, StopToken, Push, Pop, Error, Record, CompileException
-from template_preprocessor.core.preprocessable_template_tags import PREPROCESS_TAGS, NotPreprocessable
+from template_preprocessor.core.preprocessable_template_tags import get_preprocessable_tags, NotPreprocessable
 from template_preprocessor.core.lexer_engine import nest_block_level_elements, tokenize
 import re
 from copy import deepcopy
@@ -923,17 +923,20 @@ def _preprocess_macros(tree):
 
 
 def _execute_preprocessable_tags(tree):
+    preprocessable_tags = get_preprocessable_tags()
+
     for c in tree.children:
-        if isinstance(c, DjangoTag) and c.tagname in PREPROCESS_TAGS:
+        if isinstance(c, DjangoTag) and c.tagname in preprocessable_tags:
             params = [ p.output_as_string() for p in c.get_childnodes_with_name('django-tag-element') ]
             try:
-                c.children = [ PREPROCESS_TAGS[c.tagname](*params) ]
+                c.children = [ preprocessable_tags[c.tagname](*params) ]
                 c.__class__ = DjangoContent
             except NotPreprocessable:
                 pass
 
         elif isinstance(c, DjangoContainer):
             _execute_preprocessable_tags(c)
+
 
 def remember_gettext_entries(tree, context):
     """

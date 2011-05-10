@@ -4,11 +4,81 @@ from django.utils.translation import ugettext as _
 
 import re
 
+__doc__ = """
+Extensions to the preprocessor, if certain tags are possible to be preprocessed,
+you can add these in your application as follows:
+
+from template_preprocessor import preproces_tag
+
+@preprocess_tag
+def now(*args):
+    if len(args) == 2 and args[1] in (u'"Y"', u"'Y'"):
+        import datetime
+        return unicode(datetime.datetime.now().year)
+    else:
+        raise NotPreprocessable()
+
+"""
+
 
 class NotPreprocessable(Exception):
+    """
+    Raise this exception when a template tag which has been registered as being
+    preprocessable, can not be preprocessed with the current arguments.
+    """
     pass
 
 
+# === Discover preprocessable tags
+
+__preprocessabel_tags = { }
+
+def preprocess_tag(func_or_name):
+    """
+    > @preprocess_tag
+    > def my_template_tag(*args):
+    >     return '<p>.....</p>'
+
+    > @preprocess_tag('my_template_tag')
+    > def func(*args):
+    >     return '<p>.....</p>'
+    """
+    if isinstance(func_or_name, basestring):
+        def decorator(func):
+            __preprocessabel_tags[func_or_name] = func
+            return func
+        return decorator
+    else:
+        __preprocessabel_tags[func_or_name.__name__] = func_or_name
+        return func_or_name
+
+
+def discover_template_tags():
+    for a in settings.INSTALLED_APPS:
+        try:
+            __import__('%s.preprocessable_template_tags' % a)
+        except ImportError, e:
+            pass
+
+
+
+_discovered = False
+
+def get_preprocessable_tags():
+    global _discovered
+
+    if not _discovered:
+        discover_template_tags()
+        _discovered = True
+
+    return __preprocessabel_tags
+
+
+
+# ==== Build-in preprocessable tags ====
+
+
+@preprocess_tag('google_analytics')
 def _google_analytics(*args):
     if len(args) != 1: raise NotPreprocessable()
 
@@ -25,6 +95,8 @@ def _google_analytics(*args):
     </script>
     ''' % getattr(settings, 'URCHIN_ID', None))
 
+
+@preprocess_tag('now')
 def _now(*args):
     """
     The output of the following template tag will probably not change between
@@ -37,22 +109,3 @@ def _now(*args):
     else:
         raise NotPreprocessable()
 
-def _tab_content(*args):
-    return (u'<div class="tabbing-loader" style="display:none;">'
-                u'<img src="%scommon/img/loader.gif" alt="" /> %s</div>'
-                u'<div class="tabbing-content">') % (settings.MEDIA_URL, _('Loading data...'))
-
-
-
-PREPROCESS_TAGS = {
-    'google_analytics': _google_analytics,
-    'now': _now,
-
-    # Tab pages -> default style
-    'tabpage': lambda *args: u'<div class="tabbing">',
-        'tabs': lambda *args: u'<div class="tabbing-tabs">',
-        'endtabs': lambda *args: u'</div>',
-        'tabcontent': _tab_content,
-        'endtabcontent': lambda *args: u'</div>',
-    'endtabpage': lambda *args: u'</div>',
-    }
