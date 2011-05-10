@@ -176,6 +176,50 @@ Additional recommendations
 
 
 
+What if some HTML does not compile/validate.
+--------------------------------------------
+
+It is possible that some HTML cannot be processed at compile time, but you're
+absolutely sure that the output will render valid HTML at runtime. In this case
+you can tell the compiler not to try interpreting this part of HTML
+
+Use the following template tags:
+
+          {% load template_preprocessor %}
+          
+          ...
+          {% !raw %}
+            ... (tricky html, maybe other template tags, etc...)
+          {% !endraw %}
+          ...
+
+No HTML optimizations (like compression, removing comments, ...) are done
+between {% !raw %} and {% !endraw %}, while everything outside this tags is
+still optimized.
+
+
+Extending the template preprocessor in your application.
+--------------------------------------------------------
+
+Custom template tags can also be preprocessed, if the output does not depend on
+context variables. It works as follows:
+
+Make a python module `preprocessable_template_tags.py` in your application folder,
+and make sure the application appears in settings.INSTALLED_APPS.
+In this file, write template tags like:
+
+
+    from template_preprocessor import preprocess_tag
+    @preprocess_tag
+    def my_custom_tag(*args):
+        return 'This is the output of my custom template tag'
+
+    
+Every call of {% my_custom_tag %} will now be replaced by the output of this
+tag.  Also, don't forget to register normal template tags in Django, in case
+you don't use the template preprocessor.
+
+
 More information?
 -----------------
 
