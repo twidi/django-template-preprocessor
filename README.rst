@@ -6,7 +6,6 @@ Author
   Jonathan Slenders, City Live nv
 
 Description:
-
     Preprocessor for Django templates which compiles all files in a very
     compact version. This does not only result in less HTTP traffic, but also
     causes the template render engine of Django to have less work at runtime.
@@ -22,7 +21,6 @@ Description:
       request.
 
 Issues?
-
     Please report issues if you find one!
     https://github.com/citylive/django-template-preprocessor/issues
 
