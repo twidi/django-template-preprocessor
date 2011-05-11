@@ -96,7 +96,7 @@ class Command(BaseCommand):
             lang = queue[i][0]
             with language(lang):
                 if self.verbosity >= 2:
-                    print self.colored('%i / %i |' % (i, len(queue)), 'yellow'),
+                    print self.colored('%i / %i |' % (i+1, len(queue)), 'yellow'),
                     print self.colored('(%s)' % lang, 'yellow'),
                     print self.colored(queue[i][1], 'green')
 
@@ -114,7 +114,7 @@ class Command(BaseCommand):
             lang = media_queue[i][0]
             with language(lang):
                 if self.verbosity >= 2:
-                    print self.colored('%i / %i |' % (i, len(media_queue)), 'yellow'),
+                    print self.colored('%i / %i |' % (i+1, len(media_queue)), 'yellow'),
                     print self.colored('(%s)' % lang, 'yellow'),
                     print self.colored(','.join(media_queue[i][1]), 'green')
                 self._compile_media(*media_queue[i])

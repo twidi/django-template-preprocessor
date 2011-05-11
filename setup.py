@@ -7,7 +7,7 @@ setup(
     description = "Template preprocessor/compiler for Django",
     long_description = open('README.rst','r').read(),
     author = 'Jonathan Slenders, City Live nv',
-    packages = find_packages('src'),
+    packages = ['template_preprocessor'], #find_packages('src'),
     package_data = {'template_preprocessor': ['templates/*.html', 'templates/*/*.html', 'templates/*/*/*.html'],},
     include_package_data=True,
     package_dir = {'': 'src'},
