@@ -551,7 +551,7 @@ def _validate_javascript(js_node):
     # this. If semicolons are missing, we consider the code invalid.  Every
     # statement should end with a semi colon, except: for, function, if,
     # switch, try and while (See JSlint.com)
-    for scope in js_node.child_nodes_of_class([JavascriptScope]):
+    for scope in [js_node] + list(js_node.child_nodes_of_class([JavascriptScope])):
         i = [0] # Variable by referece
 
         def next():
