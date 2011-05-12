@@ -15,8 +15,6 @@ This parser will call the html/css/js parser if required.
 from django.conf import settings
 from django.template import TemplateDoesNotExist
 from django.utils.translation import ugettext as _, ungettext
-from django.core.urlresolvers import NoReverseMatch
-from django.core.urlresolvers import reverse
 
 from template_preprocessor.core.lexer import Token, State, StartToken, Shift, StopToken, Push, Pop, Error, Record, CompileException
 from template_preprocessor.core.preprocessable_template_tags import get_preprocessable_tags, NotPreprocessable
@@ -783,6 +781,12 @@ def _preprocess_urls(tree):
     """
     Replace URLs without variables by their resolved value.
     """
+    # Do 'reverse' import at this point. To be sure we have the
+    # latest version. Other Django plug-ins like localeurl tend
+    # to monkey patch this code.
+    from django.core.urlresolvers import NoReverseMatch
+    from django.core.urlresolvers import reverse
+
     def parse_url_params(urltag):
         if not urltag.url_params:
             raise CompileException(urltag, 'Attribute missing for {% url %} tag.')
