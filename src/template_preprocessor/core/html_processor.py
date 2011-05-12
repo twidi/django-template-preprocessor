@@ -693,6 +693,9 @@ def _turn_comments_to_content_in_js_and_css(tree):
         for c2 in c.child_nodes_of_class([ HtmlCDATA, HtmlComment ]):
             c2.__class__ = HtmlContent
 
+def _remove_comments(tree):
+    tree.remove_child_nodes_of_class(HtmlComment)
+
 
 def _merge_nodes_of_type(tree, type, dont_enter):
     """
@@ -1085,8 +1088,9 @@ def _process_html_tree(tree, context):
         # NOTE: Should be disabled by default. Still unreliable.
         apply_method_on_parse_tree(tree, HtmlTagAttributeValue, 'ensure_double_quotes')
 
-    # Remove the comment node <!-- --> in CSS,
+    # Turn comments into content, when they appear inside JS/CSS and remove all other comments
     _turn_comments_to_content_in_js_and_css(tree)
+    _remove_comments(tree)
 
     # Merge all internal javascript code
     if options.merge_internal_javascript:
