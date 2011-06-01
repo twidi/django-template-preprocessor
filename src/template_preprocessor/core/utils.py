@@ -46,8 +46,12 @@ def check_external_file_existance(node, url):
 
 
 def _create_directory_if_not_exists(directory):
+    """
+    Create a directory (for cache, ...) if this one does not yet exist.
+    """
     if not os.path.exists(directory):
-        os.mkdir(directory)
+        #os.mkdir(directory)
+        os.makedirs(directory)
 
 
 
