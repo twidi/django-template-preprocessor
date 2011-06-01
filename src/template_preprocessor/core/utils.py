@@ -5,6 +5,7 @@ from hashlib import md5
 
 from django.conf import settings
 from django.utils import translation
+from template_preprocessor.core.lexer import CompileException
 
 MEDIA_ROOT = settings.MEDIA_ROOT
 MEDIA_CACHE_DIR = settings.MEDIA_CACHE_DIR
