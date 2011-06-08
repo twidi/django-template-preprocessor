@@ -14,6 +14,7 @@ Similar to the javascript preprocessor. This
 will precompile the CSS in the parse tree.
 """
 
+from django.conf import settings
 
 from template_preprocessor.core.django_processor import DjangoContent, DjangoContainer
 from template_preprocessor.core.lexer import State, StartToken, Push, Record, Shift, StopToken, Pop, CompileException, Token, Error
@@ -168,6 +169,13 @@ def _rewrite_urls(css_node, base_url):
     for url_node in css_node.child_nodes_of_class([ CssUrl ]):
         if not is_absolute_url(url_node.url):
             url_node.url = os.path.normpath(os.path.join(directory, url_node.url))
+
+    # Replace urls starting with /static and /media with the real static and
+    # media urls. We cannot use settings.MEDIA_URL/STATIC_URL in external css
+    # files, and therefore we simply write /media or /static.
+    from template_preprocessor.core.utils import real_url
+    for url_node in css_node.child_nodes_of_class([ CssUrl ]):
+        url_node.url = real_url(url_node.url)
 
 
 def _compress_css_whitespace(css_node):

@@ -20,13 +20,50 @@ def get_media_source_from_url(url):
     """
     For a given media/static URL, return the matching full path in the media/static directory
     """
+    from django.contrib.staticfiles.finders import find
+
+    # Media
     if MEDIA_URL and url.startswith(MEDIA_URL):
         return os.path.join(MEDIA_ROOT, url[len(MEDIA_URL):].lstrip('/'))
 
+    elif MEDIA_URL and url.startswith('/media/'):
+        return os.path.join(MEDIA_ROOT, url[len('/media/'):].lstrip('/'))
+
+    # Static
     elif STATIC_URL and url.startswith(STATIC_URL):
-        from django.contrib.staticfiles.finders import find
-        path = url[len(STATIC_URL):].lstrip('/')
-        return find(path)
+        return find(url[len(STATIC_URL):].lstrip('/'))
+
+    elif STATIC_URL and url.startswith('/static/'):
+        return find(url[len('/static/'):].lstrip('/'))
+
+    else:
+        raise Exception('Invalid media/static url given: %s' % url)
+
+
+def simplify_media_url(url):
+    """
+    For a given media/static URL, replace the settings.MEDIA/STATIC_URL prefix
+    by simply /media or /static.
+    """
+    if url.startswith(settings.STATIC_URL):
+        return '/static/' + url[len(settings.STATIC_URL):]
+
+    if url.startswith(settings.MEDIA_URL):
+        return '/media/' + url[len(settings.MEDIA_URL):]
+
+    else:
+        return url
+
+
+def real_url(url):
+    if url.startswith('/static/'):
+        return settings.STATIC_URL + url[len('/static/'):]
+
+    elif url.startswith('/media/'):
+        return settings.MEDIA_URL + url[len('/media/'):]
+
+    else:
+        return url
 
 
 
@@ -103,7 +140,7 @@ def compile_external_javascript_files(media_files, context, start_compile_callba
         codecs.open(compiled_path, 'w', 'utf-8').write(source)
 
         # Store meta information
-        open(compiled_path + '-c-meta', 'w').write('\n'.join(media_files))
+        open(compiled_path + '-c-meta', 'w').write('\n'.join(map(simplify_media_url, media_files)))
 
     return os.path.join(MEDIA_CACHE_URL, name)
 
@@ -138,6 +175,6 @@ def compile_external_css_files(media_files, context, start_compile_callback=None
         codecs.open(compiled_path, 'w', 'utf-8').write(source)
 
         # Store meta information
-        open(compiled_path + '-c-meta', 'w').write('\n'.join(media_files))
+        open(compiled_path + '-c-meta', 'w').write('\n'.join(map(simplify_media_url, media_files)))
 
     return os.path.join(MEDIA_CACHE_URL, name)
