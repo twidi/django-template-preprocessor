@@ -51,6 +51,9 @@ class Command(BaseCommand):
         # Show all errors once again.
         print u'\n*** %i spelling errors ***' % len(self._errors)
 
+        # Ring bell :)
+        print '\x07'
+
     def _spellcheck(self, input_path):
         # Now compile all templates to the cache directory
             try:

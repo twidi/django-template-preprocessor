@@ -70,3 +70,6 @@ class Command(LabelCommand):
             print
 
         print ' %i / %i succeeded' % (succes, total)
+
+        # Ring bell :)
+        print '\x07'

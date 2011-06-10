@@ -122,6 +122,9 @@ class Command(BaseCommand):
         # Show all errors once again.
         print u'\n*** %i Media files processed, %i compile errors ***' % (len(media_queue), len(self._errors))
 
+        # Ring bell :)
+        print '\x07'
+
 
     def _build_compile_queue(self, languages, all_templates=True):
         """
