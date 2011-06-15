@@ -30,15 +30,45 @@ class Command(BaseCommand):
                         help='Tell Django to NOT prompt the user for input of any kind.'),
     )
 
+
+    def __init__(self, *args, **kwargs):
+        class NiceContext(Context):
+            """
+            Same as the real context class, but override some methods in order to gain
+            nice colored output.
+            """
+            def compile_media_callback(s, compress_tag, media_files):
+                """
+                When the compiler notifies us that compiling of this file begins.
+                """
+                print self.colored('Compiling media files from', 'yellow'),
+                print self.colored(' "%s" ' % compress_tag.path, 'green'),
+                print self.colored(' (line %s, column %s)" ' % (compress_tag.line, compress_tag.column), 'yellow')
+
+                for m in media_files:
+                    print self.colored('   * %s' % m, 'green')
+
+            def compile_media_progress_callback(s, compress_tag, media_file, current, total):
+                """
+                Print progress of compiling media files.
+                """
+                print self.colored('       (%s / %s):' % (current, total), 'yellow'),
+                print self.colored(' %s' % (media_file), 'green')
+        self.NiceContext = NiceContext
+
+        BaseCommand.__init__(self, *args, **kwargs)
+
+
+    def print_error(self, text):
+        self._errors.append(text)
+        print self.colored(text, 'white', 'on_red').encode('utf-8')
+
+
     def colored(self, text, *args, **kwargs):
         if self.boring:
             return text
         else:
             return termcolor.colored(text, *args, **kwargs)
-
-    def print_error(self, text):
-        self._errors.append(text)
-        print self.colored(text, 'white', 'on_red').encode('utf-8')
 
     def handle(self, *args, **options):
         all_templates = options['all_templates']
@@ -201,7 +231,7 @@ class Command(BaseCommand):
 
 
     def _compile_media(self, lang, input_urls, compiler):
-        context = Context('External media: ' + ','.join(input_urls))
+        context = self.NiceContext('External media: ' + ','.join(input_urls))
         compiler(input_urls, context)
 
 
@@ -257,10 +287,12 @@ class Command(BaseCommand):
             # Compile
             if no_html:
                 output, context = compile(code, path=input_path, loader=load_template_source,
-                            options=get_options_for_path(input_path) + ['no-html'])
+                            options=get_options_for_path(input_path) + ['no-html'],
+                            context_class=self.NiceContext)
             else:
                 output, context = compile(code, path=input_path, loader=load_template_source,
-                            options=get_options_for_path(input_path))
+                            options=get_options_for_path(input_path),
+                            context_class=self.NiceContext)
 
             # store dependencies
             self._save_template_dependencies(lang, template, context.template_dependencies)

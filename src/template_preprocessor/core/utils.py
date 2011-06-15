@@ -1,6 +1,7 @@
 
 import os
 import codecs
+import urllib2
 from hashlib import md5
 
 from django.conf import settings
@@ -15,6 +16,10 @@ STATIC_URL = getattr(settings, 'STATIC_URL', '')
 
 
 # =======[ Utilities for media/static files ]======
+
+def is_external_url(url):
+    return any(url.startswith(prefix) for prefix in ('http://', 'https://'))
+
 
 def get_media_source_from_url(url):
     """
@@ -36,8 +41,24 @@ def get_media_source_from_url(url):
     elif STATIC_URL and url.startswith('/static/'):
         return find(url[len('/static/'):].lstrip('/'))
 
+
+    # External URLs
+    elif is_external_url(url):
+        return url
+
     else:
         raise Exception('Invalid media/static url given: %s' % url)
+
+
+def read_media(url):
+    if is_external_url(url):
+        f = urllib2.urlopen(url)
+        if f.code == 200:
+            return f.read()
+        else:
+            raise CompileException(None, 'External media not found: %s' % url)
+    else:
+        return codecs.open(get_media_source_from_url(url), 'r', 'utf-8').read()
 
 
 def simplify_media_url(url):
@@ -66,20 +87,25 @@ def real_url(url):
         return url
 
 
-
 def check_external_file_existance(node, url):
     """
     Check whether we have a matching file in our media/static directory for this URL.
     Raise exception if we don't.
     """
-    complete_path = get_media_source_from_url(url)
+    exception = CompileException(node, 'Missing external media file (%s)' % url)
 
-    if not complete_path or not os.path.exists(complete_path):
-        if MEDIA_URL and url.startswith(MEDIA_URL):
-            raise CompileException(node, 'Missing external media file (%s)' % url)
+    if is_external_url(url):
+        if urllib2.urlopen(url).code != 200:
+            raise exception
+    else:
+        complete_path = get_media_source_from_url(url)
 
-        elif STATIC_URL and url.startswith(STATIC_URL):
-            raise CompileException(node, 'Missing external static file (%s)' % url)
+        if not complete_path or not os.path.exists(complete_path):
+            if MEDIA_URL and url.startswith(MEDIA_URL):
+                raise exception
+
+            elif STATIC_URL and url.startswith(STATIC_URL):
+                raise exception
 
 
 def _create_directory_if_not_exists(directory):
@@ -91,7 +117,6 @@ def _create_directory_if_not_exists(directory):
         os.makedirs(directory)
 
 
-
 def need_to_be_recompiled(source_files, output_file):
     """
     Returns True when one of the source files in newer then the output_file
@@ -100,9 +125,11 @@ def need_to_be_recompiled(source_files, output_file):
         # Output does not exists
         not os.path.exists(output_file) or
 
-        # Any input file has been changed after generation of the output file
-        any(os.path.getmtime(s) > os.path.getmtime(output_file) for s in map(get_media_source_from_url, source_files))
+        # Any local input file has been changed after generation of the output file
+        # (We don't check the modification date of external javascript files.)
+        any(not is_external_url(s) and os.path.getmtime(s) > os.path.getmtime(output_file) for s in map(get_media_source_from_url, source_files))
     )
+
 
 def create_media_output_path(media_files, extension, lang):
     assert extension in ('js', 'css')
@@ -114,7 +141,7 @@ def create_media_output_path(media_files, extension, lang):
 # =======[ Compiler for external media/static files ]======
 
 
-def compile_external_javascript_files(media_files, context, start_compile_callback=None):
+def compile_external_javascript_files(media_files, context, compress_tag=None):
     """
     Make sure that these external javascripts are compiled. (don't compile when not required.)
     Return output path.
@@ -127,13 +154,16 @@ def compile_external_javascript_files(media_files, context, start_compile_callba
 
     if need_to_be_recompiled(media_files, compiled_path):
         # Trigger callback, used for printing "compiling media..." feedback
-        if start_compile_callback:
-            start_compile_callback()
+        context.compile_media_callback(compress_tag, media_files)
+        progress = [0] # by reference
 
-        # concatenate and compile all scripts
-        source = u'\n'.join([
-                    compile_javascript_string(codecs.open(get_media_source_from_url(p), 'r', 'utf-8').read(), context, p)
-                    for p in media_files ])
+        def compile(media_file):
+            progress[0] += 1
+            context.compile_media_progress_callback(compress_tag, media_file, progress[0], len(media_files))
+            return compile_javascript_string(read_media(media_file), context, media_file)
+
+        # Concatenate and compile all scripts
+        source = u'\n'.join(compile(p) for p in media_files)
 
         # Store in media dir
         _create_directory_if_not_exists(os.path.split(compiled_path)[0])
@@ -145,7 +175,7 @@ def compile_external_javascript_files(media_files, context, start_compile_callba
     return os.path.join(MEDIA_CACHE_URL, name)
 
 
-def compile_external_css_files(media_files, context, start_compile_callback=None):
+def compile_external_css_files(media_files, context, compress_tag=None):
     """
     Make sure that these external css are compiled. (don't compile when not required.)
     Return output path.
@@ -158,17 +188,16 @@ def compile_external_css_files(media_files, context, start_compile_callback=None
 
     if need_to_be_recompiled(media_files, compiled_path):
         # Trigger callback, used for printing "compiling media..." feedback
-        if start_compile_callback:
-            start_compile_callback()
+        context.compile_media_callback(compress_tag, media_files)
+        progress = [0] # by reference
+
+        def compile(media_file):
+            progress[0] += 1
+            context.compile_media_progress_callback(compress_tag, media_file, progress[0], len(media_files))
+            return compile_css_string(read_media(media_file), context, get_media_source_from_url(media_file))
 
         # concatenate and compile all css files
-        source = u'\n'.join([
-                    compile_css_string(
-                                codecs.open(get_media_source_from_url(p), 'r', 'utf-8').read(),
-                                context,
-                                os.path.join(MEDIA_ROOT, p),
-                                url=os.path.join(MEDIA_URL, p))
-                    for p in media_files ])
+        source = u'\n'.join(compile(p) for p in media_files)
 
         # Store in media dir
         _create_directory_if_not_exists(os.path.split(compiled_path)[0])

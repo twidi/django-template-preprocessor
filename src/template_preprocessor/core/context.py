@@ -48,6 +48,20 @@ class Context(object):
         for o in extra_options or []:
             self.options.change(o)
 
+    def compile_media_calback(self, compress_tag, media_files):
+        """
+        Callback for the media compiler. Override for different output.
+        """
+        print 'Compiling media files from "%s" (line %s, column %s)' % \
+                        (compress_tag.path, compress_tag.line, compress_tag.column)
+        print ', '.join(media_files)
+
+    def compile_media_progress_callback(self, compress_tag, media_file, current, total):
+        """
+        Print progress of compiling media files.
+        """
+        print ' (%s / %s): %s' % (current, total, media_file)
+
     def raise_warning(self, node, message):
         """
         Log warnings: this will not raise an exception. So, preprocessing
@@ -74,17 +88,11 @@ class Context(object):
 
     # What to do with media files
 
-    def compile_js_files(self, media_files):
-        def callback():
-            print 'Compiling media: ', ', '.join(media_files)
+    def compile_js_files(self, compress_tag, media_files):
+        return compile_external_javascript_files(media_files, self, compress_tag)
 
-        return compile_external_javascript_files(media_files, self, callback)
-
-    def compile_css_files(self, media_files):
-        def callback():
-            print 'Compiling media: ', ', '.join(media_files)
-
-        return compile_external_css_files(media_files, self, callback)
+    def compile_css_files(self, compress_tag, media_files):
+        return compile_external_css_files(media_files, self, compress_tag)
 
 
 

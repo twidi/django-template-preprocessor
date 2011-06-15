@@ -24,7 +24,7 @@ from template_preprocessor.core.html_processor import HtmlContent
 import string
 from django.utils.translation import ugettext as _
 
-__JS_KEYWORDS = 'break|catch|const|continue|debugger|default|delete|do|else|enum|false|finally|for|function|gcase|if|in|instanceof|new|null|return|switch|this|throw|true|try|typeof|var|void|while|with'.split('|')
+__JS_KEYWORDS = 'break|catch|const|continue|debugger|default|delete|do|else|enum|false|finally|for|function|gcase|if|instanceof|new|null|return|switch|this|throw|true|try|typeof|var|void|while|with'.split('|')
 
 
 __JS_STATES = {
@@ -36,10 +36,11 @@ __JS_STATES = {
             State.Transition(r'"', (Push('double-quoted-string'), StartToken('js-double-quoted-string'), Shift(), )),
             State.Transition(r"'", (Push('single-quoted-string'), StartToken('js-single-quoted-string'), Shift(), )),
 
-            State.Transition(r'(break|catch|const|continue|debugger|default|delete|do|else|enum|false|finally|for|function|case|if|in|instanceof|new|null|return|switch|this|throw|true|try|typeof|var|void|while|with)(?![a-zA-Z0-9_$])',
+            State.Transition(r'(break|catch|const|continue|debugger|default|delete|do|else|enum|false|finally|for|function|case|if|instanceof|new|null|return|switch|this|throw|true|try|typeof|var|void|while|with)(?![a-zA-Z0-9_$])',
                                     (StartToken('js-keyword'), Record(), Shift(), StopToken())),
 
                 # Whitespaces are recorded in the operator. (They can be removed later on by a simple trim operator.)
+            State.Transition(r'\s*in\b\s*', (StartToken('js-operator'), Record(), Shift(), StopToken(), )), # in-operator
             State.Transition(r'\s*([;,=?:|^&=!<>*%~\.+-])\s*', (StartToken('js-operator'), Record(), Shift(), StopToken(), )),
 
                 # Place ( ... ) and [ ... ] in separate nodes.
@@ -63,13 +64,17 @@ __JS_STATES = {
             ),
     'double-quoted-string': State(
             State.Transition(r'"', (Pop(), Shift(), StopToken(), )),
+                        # Records quotes without their escape characters
             State.Transition(r"\\'", (Record("'"), Shift(), )),
+            State.Transition(r'\\"', (Record('"'), Shift(), )),
+                        # For other escapes, also save the slash
             State.Transition(r'\\(.|\n|\r)', (Record(), Shift(), )),
             State.Transition(r'[^"\\]+', (Record(), Shift(), )),
             State.Transition(r'.|\s', (Error('Error in parser #2'),)),
             ),
     'single-quoted-string': State(
             State.Transition(r"'", (Pop(), Shift(), StopToken(), )),
+            State.Transition(r"\\'", (Record("'"), Shift(), )),
             State.Transition(r'\\"', (Record('"'), Shift(), )),
             State.Transition(r'\\(.|\n|\r)', (Record(), Shift(), )),
             State.Transition(r"[^'\\]+", (Record(), Shift(), )),
@@ -324,7 +329,10 @@ def _compress_javascript_whitespace(js_node, root_node=True):
 
             # Around operators, we can delete all whitespace.
             if isinstance(c, JavascriptOperator):
-                c.children = [ c.operator ]
+                if c.operator == 'in':
+                    c.children = [ ' in ' ] # Don't trim whitespaces around the 'in' operator
+                else:
+                    c.children = [ c.operator ]
 
             _compress_javascript_whitespace(c, root_node=False)
 
@@ -416,7 +424,7 @@ def _minify_variable_names(js_node):
                 elif isinstance(n, JavascriptOperator) and n.is_comma and need_comma:
                     need_comma = False
                 else:
-                    raise CompileException(node, 'Unexpected token in function parameter list')
+                    raise CompileException(n, 'Unexpected token in function parameter list')
 
             # Skip whitespace after parameter list
             i += 1
@@ -452,9 +460,16 @@ def _minify_variable_names(js_node):
                 # Test whether this is not the key of a dictionary,
                 # if so, we shouldn't rename it.
                 try:
-                    n = js_node.children[index+1]
-                    if isinstance(n, JavascriptOperator) and n.is_colon:
-                        skip_next_var = True
+                    if index + 1 < len(js_node.children):
+                        n = js_node.children[index+1]
+                        if isinstance(n, JavascriptOperator) and n.is_colon:
+                            skip_next_var = True
+
+                    # Except for varname in this case:    (1 == 2 ? varname : 3 )
+                    if index > 0:
+                        n = js_node.children[index+1]
+                        if isinstance(n, JavascriptOperator) and n.operator == '?':
+                            skip_next_var = False
                 except IndexError, e:
                     pass
 
@@ -557,6 +572,9 @@ def _validate_javascript(js_node):
         def next():
             i[0] += 1
 
+        def has_node():
+            return i[0] < len(scope.children)
+
         def current_node():
             return scope.children[i[0]]
 
@@ -573,7 +591,7 @@ def _validate_javascript(js_node):
 
         semi_colon_required = False
 
-        while i[0] < len(scope.children):
+        while has_node():
             c = current_node()
 
             if isinstance(c, JavascriptKeyword) and c.keyword in ('for', 'if', 'switch', 'function', 'try', 'catch', 'while'):
@@ -611,11 +629,13 @@ def _validate_javascript(js_node):
                     next()
 
                 # Skip whitespace
-                while isinstance(current_node(), JavascriptWhiteSpace):
+                #  In case of "do { ...} while(1)", this may be the end of the
+                #  scope. Therefore we check has_node
+                while has_node() and isinstance(current_node(), JavascriptWhiteSpace):
                     next()
 
                 # Skip scope { ... }
-                if isinstance(current_node(), JavascriptScope):
+                if has_node() and isinstance(current_node(), JavascriptScope):
                     next()
 
                 i[0] -= 1
@@ -625,10 +645,19 @@ def _validate_javascript(js_node):
                 last_token = get_last_non_whitespace_token()
                 if last_token:
                     if isinstance(last_token, JavascriptOperator) and last_token.operator == ';':
+                        #  x = y; var ...
+                        pass
+                    elif isinstance(last_token, JavascriptOperator) and last_token.operator == ':':
+                        #  case 'x': var ...
                         pass
                     elif isinstance(last_token, JavascriptScope) or isinstance(last_token, DjangoTag):
+                        #  for (...) { ... } var ...
+                        pass
+                    elif isinstance(last_token, JavascriptParentheses):
+                        #  if (...) var ...
                         pass
                     else:
+                        print 'before var keyword'
                         found_missing()
 
             elif isinstance(c, JavascriptOperator):
@@ -644,6 +673,7 @@ def _validate_javascript(js_node):
 
             elif isinstance(c, JavascriptVariable):
                 if (semi_colon_required):
+                    print 'before variable'
                     found_missing()
 
                 semi_colon_required = True

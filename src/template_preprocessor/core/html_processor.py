@@ -15,7 +15,7 @@ Parses HTML in de parse tree. (between django template tags.)
 from template_preprocessor.core.django_processor import *
 from template_preprocessor.core.lexer import State, StartToken, Push, Record, Shift, StopToken, Pop, CompileException, Token, Error
 from template_preprocessor.core.lexer_engine import tokenize, nest_block_level_elements
-from template_preprocessor.core.utils import check_external_file_existance
+from template_preprocessor.core.utils import check_external_file_existance, is_external_url
 import string
 import codecs
 import os
@@ -930,39 +930,43 @@ def _pack_external_javascript(tree, context):
     Pack external javascript code. (between {% compress %} and {% endcompress %})
     """
     # For each {% compress %}
-    for pack_tag in tree.child_nodes_of_class([ DjangoCompressTag ]):
+    for compress_tag in tree.child_nodes_of_class([ DjangoCompressTag ]):
         # Respect the order of the scripts
         scripts_in_pack = []
 
-        # Find each external <script /> starting with the MEDIA_URL
-        for script in pack_tag.child_nodes_of_class([ HtmlScriptNode ]):
+        # Find each external <script /> starting with the MEDIA_URL or STATIC_URL
+        for script in compress_tag.child_nodes_of_class([ HtmlScriptNode ]):
             if script.is_external:
                 source = script.script_source
-                if (MEDIA_URL and source.startswith(MEDIA_URL)) or (STATIC_URL and source.startswith(STATIC_URL)):
+                if ((MEDIA_URL and source.startswith(MEDIA_URL)) or
+                        (STATIC_URL and source.startswith(STATIC_URL)) or
+                        is_external_url(source)):
                     # Add to list
                     scripts_in_pack.append(source)
                     check_external_file_existance(script, source)
 
+
         if scripts_in_pack:
             # Remember which media files were linked to this cache,
             # and compile the media files.
-            new_script_url = context.compile_js_files(scripts_in_pack)
+            new_script_url = context.compile_js_files(compress_tag, scripts_in_pack)
 
             # Replace the first external script's url by this one.
             # Remove all other external script files
             first = True
-            for script in list(pack_tag.child_nodes_of_class([ HtmlScriptNode ])):
+            for script in list(compress_tag.child_nodes_of_class([ HtmlScriptNode ])):
                 # ! Note that we made a list of the child_nodes_of_class iterator,
                 #   this is required because we are removing childs from the list here.
                 if script.is_external:
                     if ((MEDIA_URL and script.script_source.startswith(MEDIA_URL)) or
-                                (STATIC_URL and script.script_source.startswith(STATIC_URL))):
+                                (STATIC_URL and script.script_source.startswith(STATIC_URL)) or
+                                is_external_url(source)):
                         if first:
                             # Replace source
                             script.script_source = new_script_url
                             first = False
                         else:
-                            pack_tag.remove_child_nodes([script])
+                            compress_tag.remove_child_nodes([script])
 
 
 def _pack_external_css(tree, context):
@@ -979,15 +983,17 @@ def _pack_external_css(tree, context):
                 tag.get_html_attribute_value_as_string('rel') == 'stylesheet'
 
     # For each {% compress %}
-    for pack_tag in tree.child_nodes_of_class([ DjangoCompressTag ]):
+    for compress_tag in tree.child_nodes_of_class([ DjangoCompressTag ]):
         # Respect the order of the links
         css_in_pack = []
 
         # Find each external <link type="text/css" /> starting with the MEDIA_URL
-        for tag in pack_tag.child_nodes_of_class([ HtmlTag ]):
+        for tag in compress_tag.child_nodes_of_class([ HtmlTag ]):
             if is_external_css_tag(tag):
                 source = tag.get_html_attribute_value_as_string('href')
-                if (MEDIA_URL and source.startswith(MEDIA_URL)) or (STATIC_URL and source.startswith(STATIC_URL)):
+                if ((MEDIA_URL and source.startswith(MEDIA_URL)) or
+                        (STATIC_URL and source.startswith(STATIC_URL)) or
+                        is_external_url(source)):
                     # Add to list
                     css_in_pack.append( { 'tag': tag, 'source': source } )
                     check_external_file_existance(tag, source)
@@ -1004,7 +1010,7 @@ def _pack_external_css(tree, context):
             # Following css includes with same media attribute
             while css_in_pack and css_in_pack[0]['tag'].get_html_attribute_value_as_string('media') == media:
                 # Remove this tag from the HTML tree (not needed anymore)
-                pack_tag.remove_child_nodes([ css_in_pack[0]['tag'] ])
+                compress_tag.remove_child_nodes([ css_in_pack[0]['tag'] ])
 
                 # Remember source
                 css_in_current_pack.append(css_in_pack[0]['source'])
@@ -1012,7 +1018,7 @@ def _pack_external_css(tree, context):
 
             # Remember which media files were linked to this cache,
             # and compile the media files.
-            new_css_url = context.compile_css_files(css_in_current_pack)
+            new_css_url = context.compile_css_files(compress_tag, css_in_current_pack)
 
             # Update URL for first external CSS node
             first_tag.set_html_attribute('href', new_css_url)
