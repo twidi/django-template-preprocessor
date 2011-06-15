@@ -16,11 +16,13 @@ from template_preprocessor.core.django_processor import *
 from template_preprocessor.core.lexer import State, StartToken, Push, Record, Shift, StopToken, Pop, CompileException, Token, Error
 from template_preprocessor.core.lexer_engine import tokenize, nest_block_level_elements
 from template_preprocessor.core.utils import check_external_file_existance, is_external_url
-import string
-import codecs
-import os
+
 from copy import deepcopy
 from django.conf import settings
+
+import codecs
+import os
+import string
 
 
 # HTML 4 tags
@@ -902,9 +904,6 @@ from django.core.urlresolvers import reverse
 from template_preprocessor.core.css_processor import compile_css
 from template_preprocessor.core.js_processor import compile_javascript
 
-import codecs
-import os
-
 MEDIA_URL = settings.MEDIA_URL
 STATIC_URL = getattr(settings, 'STATIC_URL', '')
 
@@ -958,8 +957,9 @@ def _pack_external_javascript(tree, context):
                 # ! Note that we made a list of the child_nodes_of_class iterator,
                 #   this is required because we are removing childs from the list here.
                 if script.is_external:
-                    if ((MEDIA_URL and script.script_source.startswith(MEDIA_URL)) or
-                                (STATIC_URL and script.script_source.startswith(STATIC_URL)) or
+                    source = script.script_source
+                    if ((MEDIA_URL and source.startswith(MEDIA_URL)) or
+                                (STATIC_URL and source.startswith(STATIC_URL)) or
                                 is_external_url(source)):
                         if first:
                             # Replace source

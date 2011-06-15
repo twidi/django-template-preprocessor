@@ -24,7 +24,7 @@ from template_preprocessor.core.html_processor import HtmlContent
 import string
 from django.utils.translation import ugettext as _
 
-__JS_KEYWORDS = 'break|catch|const|continue|debugger|default|delete|do|else|enum|false|finally|for|function|gcase|if|instanceof|new|null|return|switch|this|throw|true|try|typeof|var|void|while|with'.split('|')
+__JS_KEYWORDS = 'break|catch|const|continue|debugger|default|delete|do|else|enum|false|finally|for|function|gcase|if|new|null|return|switch|this|throw|true|try|typeof|var|void|while|with'.split('|')
 
 
 __JS_STATES = {
@@ -36,11 +36,11 @@ __JS_STATES = {
             State.Transition(r'"', (Push('double-quoted-string'), StartToken('js-double-quoted-string'), Shift(), )),
             State.Transition(r"'", (Push('single-quoted-string'), StartToken('js-single-quoted-string'), Shift(), )),
 
-            State.Transition(r'(break|catch|const|continue|debugger|default|delete|do|else|enum|false|finally|for|function|case|if|instanceof|new|null|return|switch|this|throw|true|try|typeof|var|void|while|with)(?![a-zA-Z0-9_$])',
+            State.Transition(r'(break|catch|const|continue|debugger|default|delete|do|else|enum|false|finally|for|function|case|if|new|null|return|switch|this|throw|true|try|typeof|var|void|while|with)(?![a-zA-Z0-9_$])',
                                     (StartToken('js-keyword'), Record(), Shift(), StopToken())),
 
                 # Whitespaces are recorded in the operator. (They can be removed later on by a simple trim operator.)
-            State.Transition(r'\s*in\b\s*', (StartToken('js-operator'), Record(), Shift(), StopToken(), )), # in-operator
+            State.Transition(r'\s*(in|instanceof)\b\s*', (StartToken('js-operator'), Record(), Shift(), StopToken(), )), # in-operator
             State.Transition(r'\s*([;,=?:|^&=!<>*%~\.+-])\s*', (StartToken('js-operator'), Record(), Shift(), StopToken(), )),
 
                 # Place ( ... ) and [ ... ] in separate nodes.
@@ -109,7 +109,7 @@ __JS_STATES = {
     'regex-object': State(
             State.Transition(r'\\.', (Record(), Shift() )),
             State.Transition(r'[^/\\]+', (Record(), Shift(), )),
-            State.Transition(r'/[a-z]?', (Record(), Shift(), StopToken(), Pop() )), # End of regex object
+            State.Transition(r'/[a-z]*', (Record(), Shift(), StopToken(), Pop() )), # End of regex object
             State.Transition(r'.|\s', (Error('Error in parser #7'),)),
             ),
    }
@@ -256,7 +256,7 @@ class JavascriptDoubleQuotedString(JavascriptString):
 
         for c in self.children:
             if isinstance(c, basestring):
-                handler(c.replace('"', r'\"'))
+                handler(c.replace(u'"', r'\"'))
             else:
                 handler(c)
 
@@ -269,7 +269,7 @@ class JavascriptSingleQuotedString(JavascriptString):
 
         for c in self.children:
             if isinstance(c, basestring):
-                handler(c.replace("'", r"\'"))
+                handler(c.replace(u"'", r"\'"))
             else:
                 handler(c)
 
@@ -331,6 +331,8 @@ def _compress_javascript_whitespace(js_node, root_node=True):
             if isinstance(c, JavascriptOperator):
                 if c.operator == 'in':
                     c.children = [ ' in ' ] # Don't trim whitespaces around the 'in' operator
+                elif c.operator == 'instanceof':
+                    c.children = [ ' instanceof ' ] # Don't trim whitespaces around the 'in' operator
                 else:
                     c.children = [ c.operator ]
 
@@ -467,7 +469,7 @@ def _minify_variable_names(js_node):
 
                     # Except for varname in this case:    (1 == 2 ? varname : 3 )
                     if index > 0:
-                        n = js_node.children[index+1]
+                        n = js_node.children[index-1]
                         if isinstance(n, JavascriptOperator) and n.operator == '?':
                             skip_next_var = False
                 except IndexError, e:
@@ -499,7 +501,7 @@ def _minify_variable_names(js_node):
     def generate_varname(avoid_names):
         avoid_names += __JS_KEYWORDS
         def output(c):
-            return ''.join([ string.lowercase[i] for i in c ])
+            return u''.join([ string.lowercase[i] for i in c ])
 
         c = [0] # Numeral representation of character array
         while output(c) in avoid_names:

@@ -21,7 +21,6 @@ import re
 
 
 class CompileException(Exception):
-
     def __init__(self, *args):
         """
         Call:
@@ -144,7 +143,7 @@ class Token(object):
         else:
             self.output(capture)
 
-        return ''.join(o)
+        return u''.join(o)
 
     def output_params(self, handler):
         for c in self.params:

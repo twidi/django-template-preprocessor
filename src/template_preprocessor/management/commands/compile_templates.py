@@ -41,9 +41,12 @@ class Command(BaseCommand):
                 """
                 When the compiler notifies us that compiling of this file begins.
                 """
-                print self.colored('Compiling media files from', 'yellow'),
-                print self.colored(' "%s" ' % compress_tag.path, 'green'),
-                print self.colored(' (line %s, column %s)" ' % (compress_tag.line, compress_tag.column), 'yellow')
+                if compress_tag:
+                    print self.colored('Compiling media files from', 'yellow'),
+                    print self.colored(' "%s" ' % compress_tag.path, 'green'),
+                    print self.colored(' (line %s, column %s)" ' % (compress_tag.line, compress_tag.column), 'yellow')
+                else:
+                    print self.colored('Compiling media files', 'yellow')
 
                 for m in media_files:
                     print self.colored('   * %s' % m, 'green')

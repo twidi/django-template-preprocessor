@@ -52,11 +52,16 @@ def get_media_source_from_url(url):
 
 def read_media(url):
     if is_external_url(url):
-        f = urllib2.urlopen(url)
-        if f.code == 200:
-            return f.read()
-        else:
-            raise CompileException(None, 'External media not found: %s' % url)
+        try:
+            f = urllib2.urlopen(url)
+
+            if f.code == 200:
+                return f.read().decode('utf-8')
+            else:
+                raise CompileException(None, 'External media not found: %s' % url)
+
+        except urllib2.URLError, e:
+            raise CompileException(None, 'Opening %s failed: %s' % (url, e.message))
     else:
         return codecs.open(get_media_source_from_url(url), 'r', 'utf-8').read()
 
@@ -154,12 +159,12 @@ def compile_external_javascript_files(media_files, context, compress_tag=None):
 
     if need_to_be_recompiled(media_files, compiled_path):
         # Trigger callback, used for printing "compiling media..." feedback
-        context.compile_media_callback(compress_tag, media_files)
+        context.compile_media_callback(compress_tag, map(simplify_media_url, media_files))
         progress = [0] # by reference
 
         def compile(media_file):
             progress[0] += 1
-            context.compile_media_progress_callback(compress_tag, media_file, progress[0], len(media_files))
+            context.compile_media_progress_callback(compress_tag, simplify_media_url(media_file), progress[0], len(media_files))
             return compile_javascript_string(read_media(media_file), context, media_file)
 
         # Concatenate and compile all scripts
@@ -188,12 +193,12 @@ def compile_external_css_files(media_files, context, compress_tag=None):
 
     if need_to_be_recompiled(media_files, compiled_path):
         # Trigger callback, used for printing "compiling media..." feedback
-        context.compile_media_callback(compress_tag, media_files)
+        context.compile_media_callback(compress_tag, map(simplify_media_url, media_files))
         progress = [0] # by reference
 
         def compile(media_file):
             progress[0] += 1
-            context.compile_media_progress_callback(compress_tag, media_file, progress[0], len(media_files))
+            context.compile_media_progress_callback(compress_tag, simplify_media_url(media_file), progress[0], len(media_files))
             return compile_css_string(read_media(media_file), context, get_media_source_from_url(media_file))
 
         # concatenate and compile all css files
