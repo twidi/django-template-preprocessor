@@ -205,7 +205,7 @@ def compile_external_css_files(media_files, context, compress_tag=None):
             context.compile_media_progress_callback(compress_tag, simplify_media_url(media_file), progress[0], len(media_files))
 
             if not is_remote_url(media_file) or context.options.compile_remote_css:
-                return compile_css_string(read_media(media_file), context, get_media_source_from_url(media_file))
+                return compile_css_string(read_media(media_file), context, get_media_source_from_url(media_file), media_file)
             else:
                 return read_media(media_file)
 
