@@ -15,7 +15,7 @@ Parses HTML in de parse tree. (between django template tags.)
 from template_preprocessor.core.django_processor import *
 from template_preprocessor.core.lexer import State, StartToken, Push, Record, Shift, StopToken, Pop, CompileException, Token, Error
 from template_preprocessor.core.lexer_engine import tokenize, nest_block_level_elements
-from template_preprocessor.core.utils import check_external_file_existance, is_external_url
+from template_preprocessor.core.utils import check_external_file_existance, is_remote_url
 
 from copy import deepcopy
 from django.conf import settings
@@ -415,23 +415,6 @@ class HtmlTagAttributeName(HtmlNode):
 class HtmlTagAttributeValue(HtmlNode):
     def init_extension(self):
         self.__double_quotes = False
-
-    def ensure_double_quotes(self):
-        """
-        Always output double quotes
-        TODO: this does not always work. Causes sometimes double double-quotes
-        """
-        # Remove quotes if they already exist in child nodes
-        if len(self.children) >= 1:
-            if isinstance(self.children[0], basestring) and isinstance(self.children[-1], basestring):
-                if self.children[0][:1] in ('"', "'"):
-                    self.children[0] = self.children[0][1:]
-
-                if self.children[-1][-1:] in ('"', "'"):
-                    self.children[-1] = self.children[0][:-1]
-
-            # Append double quotes in output
-            self.__double_quotes = True
 
     def output(self, handler):
         if self.__double_quotes:
@@ -939,7 +922,7 @@ def _pack_external_javascript(tree, context):
                 source = script.script_source
                 if ((MEDIA_URL and source.startswith(MEDIA_URL)) or
                         (STATIC_URL and source.startswith(STATIC_URL)) or
-                        is_external_url(source)):
+                        is_remote_url(source)):
                     # Add to list
                     scripts_in_pack.append(source)
                     check_external_file_existance(script, source)
@@ -960,7 +943,7 @@ def _pack_external_javascript(tree, context):
                     source = script.script_source
                     if ((MEDIA_URL and source.startswith(MEDIA_URL)) or
                                 (STATIC_URL and source.startswith(STATIC_URL)) or
-                                is_external_url(source)):
+                                is_remote_url(source)):
                         if first:
                             # Replace source
                             script.script_source = new_script_url
@@ -993,7 +976,7 @@ def _pack_external_css(tree, context):
                 source = tag.get_html_attribute_value_as_string('href')
                 if ((MEDIA_URL and source.startswith(MEDIA_URL)) or
                         (STATIC_URL and source.startswith(STATIC_URL)) or
-                        is_external_url(source)):
+                        is_remote_url(source)):
                     # Add to list
                     css_in_pack.append( { 'tag': tag, 'source': source } )
                     check_external_file_existance(tag, source)
@@ -1087,12 +1070,6 @@ def _process_html_tree(tree, context):
         # Validate nesting.
         _check_no_block_level_html_in_inline_html(tree, options)
         _check_for_unmatched_closing_html_tags(tree)
-
-
-    # Place double quotes around HTML attributes
-    if options.ensure_quotes_around_html_attributes:
-        # NOTE: Should be disabled by default. Still unreliable.
-        apply_method_on_parse_tree(tree, HtmlTagAttributeValue, 'ensure_double_quotes')
 
     # Turn comments into content, when they appear inside JS/CSS and remove all other comments
     _turn_comments_to_content_in_js_and_css(tree)

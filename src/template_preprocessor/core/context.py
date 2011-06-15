@@ -48,7 +48,7 @@ class Context(object):
         for o in extra_options or []:
             self.options.change(o)
 
-    def compile_media_calback(self, compress_tag, media_files):
+    def compile_media_callback(self, compress_tag, media_files):
         """
         Callback for the media compiler. Override for different output.
         """
@@ -125,7 +125,8 @@ class Options(object):
 
         self.compile_css = True
         self.compile_javascript = True
-        self.ensure_quotes_around_html_attributes = False # Not reliable for now...
+        self.compile_remote_css = False
+        self.compile_remote_javascript = False
         self.merge_internal_css = False
         self.merge_internal_javascript = False # Not always recommended...
         self.remove_empty_class_attributes = False

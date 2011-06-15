@@ -18,13 +18,15 @@ import os
 import codecs
 
 
-# Override this compiler options during run-time
-_OVERRIDE_OPTIONS_AT_RUNTIME = [
+# Override this compiler options for following template loaders
+_OVERRIDE_OPTIONS_FOR_VALIDATION = [
         # No processing of external media, this quickly becomes too slow to
         # do in real time for a lot of media.
-        'pack-external-css',
-        'pack-external-javascript' ]
+        'no-pack-external-css',
+        'no-pack-external-javascript'
+        ]
 
+_OVERRIDE_OPTIONS_AT_RUNTIME_PROCESSED = [ ]
 
 
 class _Base(BaseLoader):
@@ -119,7 +121,7 @@ class RuntimeProcessedLoader(_Base):
 
         # Compile template
         template, context = compile(template, path=template_name, loader = lambda path: self.find_template(path)[0],
-                        options=get_options_for_path(origin.name) + _OVERRIDE_OPTIONS_AT_RUNTIME)
+                        options=get_options_for_path(origin.name) + _OVERRIDE_OPTIONS_AT_RUNTIME_PROCESSED )
 
         # Turn into Template object
         template = get_template_from_string(template, origin, template_name)
@@ -160,7 +162,7 @@ class ValidatorLoader(_Base):
                 execute_precompile_command()
 
                 compile(template, loader = lambda path: self.find_template(path)[0], path=template_name,
-                            options=get_options_for_path(origin.name) + _OVERRIDE_OPTIONS_AT_RUNTIME)
+                            options=get_options_for_path(origin.name) + _OVERRIDE_OPTIONS_FOR_VALIDATION )
 
         except Exception, e:
             # Print exception on console
