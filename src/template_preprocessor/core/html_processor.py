@@ -1133,7 +1133,7 @@ def _insert_debug_symbols(tree, context):
 
         apply_source_list = [] # (tag, source)
 
-        for tag in body_node.child_nodes_of_class([ HtmlTagPair ]):
+        for tag in body_node.child_nodes_of_class([ HtmlTagPair, HtmlTag ]):
             def output_hook(tag):
                 return '{$ %s $}' % tag_references[tag]
 
@@ -1142,10 +1142,13 @@ def _insert_debug_symbols(tree, context):
                     HtmlTag: output_hook
                     }
 
-            apply_source_list.append((tag.open_tag, tag.output_as_string(hook_dict=hooks)))
+            apply_source_list.append((tag, tag.output_as_string(hook_dict=hooks)))
 
         for tag, source in apply_source_list:
-            tag.set_html_attribute('d:s', source)
+            if isinstance(tag, HtmlTagPair):
+                tag.open_tag.set_html_attribute('d:s', source)
+            else:
+                tag.set_html_attribute('d:s', source)
 
     # For every HTML node, add the following attributes:
     #  d:t="template.html"
