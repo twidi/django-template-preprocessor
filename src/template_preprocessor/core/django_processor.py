@@ -314,6 +314,20 @@ class DjangoTransTag(Token):
         else:
             handler(u'{%trans "'); handler(self.__string); handler(u'"%}')
 
+    @property
+    def translation_info(self):
+        """
+        Return an object which is compatible with {% blocktrans %}-info.
+        (Only to be used when this string is not a variable, so not for {% trans var %} )
+        """
+        class TransInfo(object):
+            def __init__(self, trans):
+                self.has_plural = False
+                self.plural_string = u''
+                self.string = trans.string
+                self.variables = set()
+                self.plural_variables = set()
+        return TransInfo(self)
 
 class DjangoBlocktransTag(Token):
     """
@@ -596,7 +610,8 @@ class DjangoPreprocessedVariable(DjangoContent):
         self.children = var_value
 
 class DjangoTranslated(DjangoContent):
-    def init(self, translated_text):
+    def init(self, translated_text, translation_info):
+        self.translation_info = translation_info
         self.children = [ translated_text ]
 
 
@@ -891,14 +906,15 @@ def _preprocess_trans_tags(tree):
 
             # Replace {% blocktrans %} by its translated output.
             trans.__class__ = DjangoTranslated
-            trans.init(output)
+            trans.init(output, translation_info)
 
         # Process {% trans "..." %}
         else:
             if not trans.is_variable:
                 output = _(trans.string)
+                translation_info = trans.translation_info
                 trans.__class__ = DjangoTranslated
-                trans.init(output)
+                trans.init(output, translation_info)
 
 
 def _preprocess_ifdebug(tree):

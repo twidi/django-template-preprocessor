@@ -291,6 +291,9 @@ class HtmlTag(HtmlNode):
             return result.strip('"\'')
         return None
 
+    def is_inline(self):
+        return self.html_tagname in __HTML_INLINE_LEVEL_ELEMENTS
+
     @property
     def is_closing_html_tag(self):
         """
@@ -1104,11 +1107,45 @@ def _insert_debug_symbols(tree, context):
         if tag.html_tagname == 'head':
             head_node = tag
 
-    # HIGHLY EXPERIMENTAL: add complete template source of this node as a
-    # tag of it's own node. (not optimal and can cause O(n*n) space.
-    # Only block nodes inside <body/>
-    for tag in body_node.child_nodes_of_class([ HtmlTagPair ]):
-        tag.open_tag.set_html_attribute('d:s', tag.output_as_string())
+    # Give every node a debug reference
+    tag_references = { }
+
+    def create_references():
+        ref_counter = [0]
+        for tag in body_node.child_nodes_of_class([ HtmlTagPair, HtmlTag ]):
+                tag_references[tag] = ref_counter[0]
+                ref_counter[0] += 1
+    create_references()
+
+    def apply_tag_refences():
+        for tag, ref_counter in tag_references.items():
+            if isinstance(tag, HtmlTagPair):
+                tag.open_tag.set_html_attribute('d:ref', ref_counter)
+            else:
+                tag.set_html_attribute('d:ref', ref_counter)
+
+    # Add template source of this node as an attribute of it's own node.
+    # Only for block nodes inside <body/>
+    if body_node:
+        # The parent node would contain the source of every child node as
+        # well, but we do not want to send the same source 100times to the browser.
+        # Therefor we add hooks for every tag, and replace it by pointers.
+
+        apply_source_list = [] # (tag, source)
+
+        for tag in body_node.child_nodes_of_class([ HtmlTagPair ]):
+            def output_hook(tag):
+                return '{$ %s $}' % tag_references[tag]
+
+            hooks = {
+                    HtmlTagPair: output_hook,
+                    HtmlTag: output_hook
+                    }
+
+            apply_source_list.append((tag.open_tag, tag.output_as_string(hook_dict=hooks)))
+
+        for tag, source in apply_source_list:
+            tag.set_html_attribute('d:s', source)
 
     # For every HTML node, add the following attributes:
     #  d:t="template.html"
@@ -1143,26 +1180,38 @@ def _insert_debug_symbols(tree, context):
     # Note that we can do this only when the traces before and after {% trans %}
     # are still matching. This is only when the HTML parser did not mess up
     # the parse tree like in: "<p>{% trans "</p>" %}"
-    def find_matching_traces(tree):
+    def find_matching_traces(tree, is_inline=False):
         last_trace = None
 
         for node in tree.children:
             if (last_trace and isinstance(last_trace, BeforeDjangoTranslatedTrace) and
                         isinstance(node, AfterDjangoTranslatedTrace) and last_trace.original_node == node.original_node):
                 original_node = node.original_node
-                last_trace.children = [ '<tp:trans tp:c="%s" tp:l="%s" tp:t="%s">' % (
-                            original_node.column, original_node.line, original_node.path) ]
-                node.children = [ '</tp:trans>' ]
+                tagname = 'tp:trans'
+                last_trace.children = [ '<%s tp:c="%s" tp:l="%s" tp:t="%s" tp:s="%s">' % (
+                            tagname,
+                            original_node.column, original_node.line, original_node.path,
+                            xml_escape(original_node.translation_info.string)
+                            ) ]
+                node.children = [ '</%s>' % tagname ]
 
             if isinstance(node, Trace):
                 last_trace = node
 
             # Recursively find matching traces in
-            if isinstance(node, Token) and not any(isinstance(node, c) for c in (Trace, HtmlScriptNode, HtmlStyleNode)):
-                find_matching_traces(node)
+            if isinstance(node, HtmlTagPair):
+                find_matching_traces(node, is_inline or node.open_tag.is_inline)
 
-    if body_node:
-        find_matching_traces(body_node)
+            elif isinstance(node, Token) and not any(isinstance(node, c) for c in (Trace, HtmlScriptNode, HtmlStyleNode, HtmlTag)):
+                find_matching_traces(node, is_inline)
+
+#    if body_node:
+#        find_matching_traces(body_node)
+
+#  TODO: don't place string inside custom tags, as that can destroy the CSS
+#  layout very much, but add these properties to an attribute of the parent
+#  node, somewhere... OR! bring both the beginning and end markers to the
+#  client, like <tp:trans-start ...></tp:trans-start> ..... <tp:trans-end></tp:trans-end>
 
     # For every <html> node, insert a <script>-node at the end, which points
     # to the debug script of the preprocessor for handling this information.
@@ -1180,6 +1229,9 @@ def _insert_debug_symbols(tree, context):
     if body_node:
         body_node.children.append('<span style="display:none;" class="tp-context-id">' +
                         '{{ template_preprocessor_context_id }}</span>')
+
+    # Apply tag references as attributes now. (The output could be polluted if we did this earlier)
+    apply_tag_refences()
 
 
 # ==================================[  HTML Parser ]================================

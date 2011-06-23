@@ -230,6 +230,7 @@ class JavascriptVariable(JavascriptNode):
         else:
             Token.output(self, handler)
 
+
 class JavascriptString(JavascriptNode):
     @property
     def value(self):

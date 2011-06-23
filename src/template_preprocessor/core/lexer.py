@@ -95,6 +95,9 @@ class Token(object):
         return tree
 
     def _print(self, prefix=''):
+        """
+        For debugging: print the output to a unix terminal for a colored parse tree.
+        """
         result = []
 
         result.append('\033[34m')
@@ -116,20 +119,37 @@ class Token(object):
 
     def output(self, handler):
         """
-        Method for generating the output. To be overriden in the parse tree.
+        Method for generating the output.
+        This calls the output handler for every child of this node.
+        To be overriden in the parse tree. (an override can output additional information.)
         """
         for c in self.children:
             handler(c)
 
     def _output(self, handler):
-        """ Original output method. """
+        """
+        Original output method.
+        """
         for c in self.children:
             handler(c)
 
-    def output_as_string(self, use_original_output_method=False):
+    def output_as_string(self, use_original_output_method=False, hook_dict=None):
+        """
+        Return a unicode string of this node
+        The `hook_dict` parameter can be used to override the output behaviour of
+        certain classes, and insert own output hooks instead.
+        !! Ensure that the classes in hook_dict have no parent/child relationship,
+           every isinstance match will be called.
+        """
+        hook_dict = hook_dict or { }
         o = []
         def capture(s):
-            if isinstance(s, basestring):
+            if any(isinstance(s, k) for k in hook_dict):
+                for k in hook_dict:
+                    if isinstance(s, k):
+                        o.append(hook_dict[k](s))
+
+            elif isinstance(s, basestring):
                 o.append(s)
 
             elif use_original_output_method:
