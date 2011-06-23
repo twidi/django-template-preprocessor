@@ -27,8 +27,9 @@ class Context(object):
     Preprocess context. Contains the compile settings, error logging,
     remembers dependencies, etc...
     """
-    def __init__(self, path, loader=None, extra_options=None):
+    def __init__(self, path, loader=None, extra_options=None, insert_debug_symbols=False):
         self.loader = loader
+        self.insert_debug_symbols = insert_debug_symbols
 
         # Remember stuff
         self.warnings = []
@@ -56,11 +57,11 @@ class Context(object):
                         (compress_tag.path, compress_tag.line, compress_tag.column)
         print ', '.join(media_files)
 
-    def compile_media_progress_callback(self, compress_tag, media_file, current, total):
+    def compile_media_progress_callback(self, compress_tag, media_file, current, total, file_size):
         """
         Print progress of compiling media files.
         """
-        print ' (%s / %s): %s' % (current, total, media_file)
+        print ' (%s / %s): %s  (%s bytes)' % (current, total, media_file, file_size)
 
     def raise_warning(self, node, message):
         """

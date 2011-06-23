@@ -86,6 +86,16 @@ __HTML_ATTRIBUTES = {
 # TODO: check whether forms have {% csrf_token %}
 # TODO: check whether all attributes are valid.
 
+def xml_escape(s):
+    # XML escape
+    s = unicode(s).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')#.replace("'", '&#39;')
+
+    # Escape braces, to make sure Django tags will not be rendered in here.
+    s = unicode(s).replace('}', '&#x7d;').replace('{', '&#x7b;')
+
+    return s
+
+
 
 __HTML_STATES = {
     'root' : State(
@@ -310,7 +320,7 @@ class HtmlTag(HtmlNode):
                 self.remove_child_nodes([ a ])
 
         # Set attribute
-        self.add_attribute(name, '"%s"' % attribute_value) # TODO: XML escape
+        self.add_attribute(name, '"%s"' % xml_escape(attribute_value))
 
 
     def add_attribute(self, name, attribute_value):
@@ -405,6 +415,15 @@ class HtmlTagAttribute(HtmlNode):
         return val[0] if val else None
 
 
+class HtmlTagPair(HtmlNode):
+    """
+    Container for the opening HTML tag, the matching closing HTML
+    and all the content. (e.g. <p> + ... + </p>)
+    This is overriden for every possible HTML tag.
+    """
+    pass
+
+
 class HtmlTagWhitespace(HtmlNode):
     pass
 
@@ -456,7 +475,7 @@ class HtmlScriptNode(HtmlNode):
             return self.__attrs['src='].strip('"\'')
 
     def _set_script_source(self, value):
-        self.__attrs['src='] = '"%s"' % value # TODO: XML escape
+        self.__attrs['src='] = '"%s"' % xml_escape(value)
 
     script_source = property(_get_script_source, _set_script_source)
 
@@ -585,30 +604,51 @@ def _nest_elements(tree):
 # ==================================[  HTML Tree manipulations ]================================
 
 
-def _merge_content_nodes(tree):
+def _merge_content_nodes(tree, context):
     """
-    Merge whitespace and content nodes.
-    """
-    last_child = None
+    Concatenate whitespace and content nodes.
+    e.g. when the we have "<p>...{% trans "</p>" %}" these nodes will be
+         concatenated into one single node. (A preprocessed translation is a
+         HtmlContent node)
+    The usage in the example above is abuse, but in case of {% url %} and
+    {% trans %} blocks inside javascript code, we want them all to be
+    concatenated in order to make it possible to check the syntax of the
+    result.
+    e.g. "alert('{% trans "some weird characters in here: ',! " %}');"
 
-    for c in tree.children[:]:
-        if isinstance(c, HtmlContent):
-            # Second content node (following another content node)
-            if last_child:
-                for i in c.children:
-                    last_child.children.append(i)
-                tree.children.remove(c)
-            # Every first content node
+    When insert_debug_symbols is on, only apply concatenation inside CSS and
+    Javascript nodes. We want to keep the {% trans %} nodes in <body/> for
+    adding line/column number annotations later on.
+    """
+    def apply(tree):
+        last_child = None
+
+        for c in tree.children[:]:
+            if isinstance(c, HtmlContent):
+                # Second content node (following another content node)
+                if last_child:
+                    for i in c.children:
+                        last_child.children.append(i)
+                    tree.children.remove(c)
+                # Every first content node
+                else:
+                    last_child = c
+                    last_child.__class__ = HtmlContent
             else:
-                last_child = c
-                last_child.__class__ = HtmlContent
-        else:
-            last_child = None
+                last_child = None
 
-    # Apply recursively
-    for c in tree.children:
-        if isinstance(c, Token):
-            _merge_content_nodes(c)
+        # Apply recursively
+        for c in tree.children:
+            if isinstance(c, Token):
+                _merge_content_nodes(c, context)
+
+    # Concatenate nodes
+    if context.insert_debug_symbols:
+        # In debug mode: only inside script/style nodes
+        for n in tree.child_nodes_of_class([ HtmlStyleNode, HtmlScriptNode ]):
+            apply(n)
+    else:
+        apply(tree)
 
 
 def _remove_whitespace_around_html_block_level_tags(tree):
@@ -677,6 +717,7 @@ def _turn_comments_to_content_in_js_and_css(tree):
     for c in tree.child_nodes_of_class([ HtmlStyleNode, HtmlScriptNode ]):
         for c2 in c.child_nodes_of_class([ HtmlCDATA, HtmlComment ]):
             c2.__class__ = HtmlContent
+
 
 def _remove_comments(tree):
     tree.remove_child_nodes_of_class(HtmlComment)
@@ -808,24 +849,32 @@ def _nest_all_elements(tree):
     """
     Manipulate the parse tree by combining all opening and closing html nodes,
     to reflect the nesting of HTML nodes in the tree.
-    So where '<p>' and '</p>' where two independent simblings in the source three,
+    So where '<p>' and '</p>' where two independent siblings in the source three,
     they become one now, and everything in between is considered a child of this tag.
     """
     # NOTE: this does not yet combile unknown tags, like <fb:like/>,
     #       maybe it's better to replace this code by a more dynamic approach.
+    #       Or we can ignore them, like we do know, because we're not unsure
+    #       how to thread them.
     def _create_html_tag_node(name):
-        class tag_node(HtmlNode):
+        class tag_node(HtmlTagPair):
             html_tagname = ''
             def process_params(self, params):
-                self.__open_tag = HtmlTag()
-                self.__open_tag.children = params
+                # Create new node for the opening html tag
+                self._open_tag = HtmlTag()
+                self._open_tag.children = params
+
+                # Copy line/column number information
+                self._open_tag.line = self.line
+                self._open_tag.column = self.column
+                self._open_tag.path = self.path
 
             @property
             def open_tag(self):
-                return self.__open_tag
+                return self._open_tag
 
             def output(self, handler):
-                self.__open_tag.output(handler)
+                self._open_tag.output(handler)
                 Token.output(self, handler)
                 handler('</%s>' % name)
 
@@ -1007,6 +1056,132 @@ def _pack_external_css(tree, context):
             first_tag.set_html_attribute('href', new_css_url)
 
 
+# ==================================[  Debug extensions ]================================
+
+class Trace(Token):
+    def __init__(self, original_node):
+        Token.__init__(self, line=original_node.line, column=original_node.column, path=original_node.path)
+        self.original_node = original_node
+
+class BeforeDjangoTranslatedTrace(Trace): pass
+class AfterDjangoTranslatedTrace(Trace): pass
+class BeforeDjangoPreprocessedUrlTrace(Trace): pass
+class AfterDjangoPreprocessedUrlTrace(Trace): pass
+
+
+def _insert_debug_trace_nodes(tree, context):
+    """
+    If we need debug symbols. We have to insert a few traces.
+    DjangoTranslated and DjangoPreprocessedUrl will are concidered content
+    during the HTML parsing and will disappear.
+    We add a trace before and after this nodes. if they still match after
+    HTML parsing (which should unless in bad cases like "<p>{%trans "</p>" %}")
+    then we can insert debug symbols.
+    """
+    def insert_trace(cls, before_class, after_class):
+        for trans in tree.child_nodes_of_class([ cls ]):
+            trans_copy = deepcopy(trans)
+
+            trans.children.insert(0, before_class(trans_copy))
+            trans.children.append(after_class(trans_copy))
+
+    insert_trace(DjangoTranslated, BeforeDjangoTranslatedTrace, AfterDjangoTranslatedTrace)
+    insert_trace(DjangoPreprocessedUrl, BeforeDjangoPreprocessedUrlTrace, AfterDjangoPreprocessedUrlTrace)
+
+
+def _insert_debug_symbols(tree, context):
+    """
+    Insert useful debugging information into the template.
+    """
+    # Find head/body nodes
+    body_node = None
+    head_node = None
+
+    for tag in tree.child_nodes_of_class([ HtmlTagPair ]):
+        if tag.html_tagname == 'body':
+            body_node = tag
+
+        if tag.html_tagname == 'head':
+            head_node = tag
+
+    # HIGHLY EXPERIMENTAL: add complete template source of this node as a
+    # tag of it's own node. (not optimal and can cause O(n*n) space.
+    # Only block nodes inside <body/>
+    for tag in body_node.child_nodes_of_class([ HtmlTagPair ]):
+        tag.open_tag.set_html_attribute('d:s', tag.output_as_string())
+
+    # For every HTML node, add the following attributes:
+    #  d:t="template.html"
+    #  d:l="line_number"
+    #  d:c="column_number"
+    #  d:href="{% url ... %}"
+    def add_template_info(tag):
+        tag.set_html_attribute('d:t', tag.path)
+        tag.set_html_attribute('d:l', tag.line)
+        tag.set_html_attribute('d:c', tag.column)
+
+        # For every hyperlink, like <a href="{% url ... %}">, add an attribute d:href="...",
+        # where this contains the original url tag, without escaping.
+        if tag.html_tagname == 'a':
+            href = tag.html_attributes.get('href', None)
+
+            if href:
+                for url in href.child_nodes_of_class([ DjangoUrlTag ]):
+                    tag.set_html_attribute('d:href', url.output_as_string())
+
+                for url in href.child_nodes_of_class([ DjangoPreprocessedUrl ]):
+                    tag.set_html_attribute('d:href', url.original_urltag.output_as_string())
+
+    for tag in tree.child_nodes_of_class([ HtmlTag ]):
+        add_template_info(tag)
+
+    for tag in tree.child_nodes_of_class([ HtmlTagPair ]):
+        add_template_info(tag.open_tag)
+
+    # Surround every {% trans %} block which does not appear into Javascript or Css
+    # by <span d:l="..." d:c="..." d:o="original_string..." ...>
+    # Note that we can do this only when the traces before and after {% trans %}
+    # are still matching. This is only when the HTML parser did not mess up
+    # the parse tree like in: "<p>{% trans "</p>" %}"
+    def find_matching_traces(tree):
+        last_trace = None
+
+        for node in tree.children:
+            if (last_trace and isinstance(last_trace, BeforeDjangoTranslatedTrace) and
+                        isinstance(node, AfterDjangoTranslatedTrace) and last_trace.original_node == node.original_node):
+                original_node = node.original_node
+                last_trace.children = [ '<tp:trans tp:c="%s" tp:l="%s" tp:t="%s">' % (
+                            original_node.column, original_node.line, original_node.path) ]
+                node.children = [ '</tp:trans>' ]
+
+            if isinstance(node, Trace):
+                last_trace = node
+
+            # Recursively find matching traces in
+            if isinstance(node, Token) and not any(isinstance(node, c) for c in (Trace, HtmlScriptNode, HtmlStyleNode)):
+                find_matching_traces(node)
+
+    if body_node:
+        find_matching_traces(body_node)
+
+    # For every <html> node, insert a <script>-node at the end, which points
+    # to the debug script of the preprocessor for handling this information.
+    if body_node:
+        body_node.children.append('<script type="text/javascript" src="/static/template_preprocessor/js/debug.js"></script>')
+
+    if head_node:
+        head_node.children.append('<link type="text/css" rel="stylesheet" href="/static/template_preprocessor/css/debug.css" />')
+
+    # Add {{ template_preprocessor_context_id }} variable to body.
+    # If this variable exist in the context during rendering, it means that
+    # the context will be remained in cache by the template loader, and that
+    # javascript can do a reload call to automatically reload the page on
+    # the first change in any related source file.
+    if body_node:
+        body_node.children.append('<span style="display:none;" class="tp-context-id">' +
+                        '{{ template_preprocessor_context_id }}</span>')
+
+
 # ==================================[  HTML Parser ]================================
 
 
@@ -1033,6 +1208,10 @@ def compile_html(tree, context):
     """
     Compile the html in content nodes
     """
+    # If we need debug symbols. We have to insert a few traces.
+    if context.insert_debug_symbols:
+        _insert_debug_trace_nodes(tree, context)
+
     # Parse HTML code in parse tree (Note that we don't enter DjangoRawTag)
     tokenize(tree, __HTML_STATES, [DjangoContent], [DjangoContainer ])
     _process_html_tree(tree, context)
@@ -1083,13 +1262,8 @@ def _process_html_tree(tree, context):
     if options.merge_internal_css:
         _merge_internal_css(tree)
 
-    # Whitespace compression
-    if options.whitespace_compression:
-        _compress_whitespace(tree)
-        _remove_whitespace_around_html_block_level_tags(tree)
-
     # Need to be done before JS or CSS compiling.
-    _merge_content_nodes(tree)
+    _merge_content_nodes(tree, context)
 
     # Pack external Javascript
     if options.pack_external_javascript:
@@ -1123,4 +1297,13 @@ def _process_html_tree(tree, context):
 
 
     ## TODO: remove emty CSS nodes <style type="text/css"><!-- --></style>
+
+    # Insert DEBUG symbols (for bringing line/column numbers to web client)
+    if context.insert_debug_symbols:
+        _insert_debug_symbols(tree, context)
+
+    # Whitespace compression
+    if options.whitespace_compression:
+        _compress_whitespace(tree)
+        _remove_whitespace_around_html_block_level_tags(tree)
 

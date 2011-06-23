@@ -28,6 +28,8 @@ class Command(BaseCommand):
         make_option('--boring', action='store_true', dest='boring', help='No colors in output'),
         make_option('--noinput', action='store_false', dest='interactive', default=True,
                         help='Tell Django to NOT prompt the user for input of any kind.'),
+        make_option('--insert-debug-symbols', action='store_true', dest='insert_debug_symbols', default=False,
+                        help='Insert debug symbols in template output')
     )
 
 
@@ -76,6 +78,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         all_templates = options['all_templates']
         interactive = options['interactive']
+        insert_debug_symbols = options['insert_debug_symbols']
 
         # Default verbosity
         self.verbosity = int(options.get('verbosity', 1))

@@ -587,12 +587,18 @@ class DjangoPreprocessedCallMacro(DjangoContainer):
         self.children = children
 
 class DjangoPreprocessedUrl(DjangoContent):
-    def init(self, url_value):
+    def init(self, url_value, original_urltag):
         self.children = [ url_value]
+        self.original_urltag = original_urltag
 
 class DjangoPreprocessedVariable(DjangoContent):
     def init(self, var_value):
         self.children = var_value
+
+class DjangoTranslated(DjangoContent):
+    def init(self, translated_text):
+        self.children = [ translated_text ]
+
 
 
 # ====================================[ Parse tree manipulations ]=====================================
@@ -781,7 +787,7 @@ def _preprocess_urls(tree):
     """
     Replace URLs without variables by their resolved value.
     """
-    # Do 'reverse' import at this point. To be sure we have the
+    # Do 'reverse' import at this point. To be sure we use the
     # latest version. Other Django plug-ins like localeurl tend
     # to monkey patch this code.
     from django.core.urlresolvers import NoReverseMatch
@@ -810,8 +816,9 @@ def _preprocess_urls(tree):
             name, args, kwargs = parse_url_params(urltag)
             if not 'as' in args:
                 result = reverse(name, args=args, kwargs=kwargs)
+                urltag_copy = deepcopy(urltag)
                 urltag.__class__ = DjangoPreprocessedUrl
-                urltag.init(result)
+                urltag.init(result, urltag_copy)
         except NoReverseMatch, e:
             pass
         except NoLiteraleException, e:
@@ -835,15 +842,10 @@ def _preprocess_variables(tree, values_dict):
                 #          and 'resolve' is only be used for variables
                 #          like MEDIA_URL which are safe in HTML.
 
-
 def _preprocess_trans_tags(tree):
     """
     Replace {% trans %} and {% blocktrans %} if they don't depend on variables.
     """
-    class DjangoTranslated(DjangoContent):
-        def init(self, translated_text):
-            self.children = [ translated_text ]
-
     convert_var = lambda v: '%%(%s)s' % v
 
     for trans in tree.child_nodes_of_class([ DjangoTransTag, DjangoBlocktransTag ]):

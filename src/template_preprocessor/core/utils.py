@@ -164,12 +164,15 @@ def compile_external_javascript_files(media_files, context, compress_tag=None):
 
         def compile_part(media_file):
             progress[0] += 1
-            context.compile_media_progress_callback(compress_tag, simplify_media_url(media_file), progress[0], len(media_files))
+            media_content = read_media(media_file)
+
+            context.compile_media_progress_callback(compress_tag, simplify_media_url(media_file),
+                        progress[0], len(media_files), len(media_content))
 
             if not is_remote_url(media_file) or context.options.compile_remote_javascript:
-                return compile_javascript_string(read_media(media_file), context, media_file)
+                return compile_javascript_string(media_content, context, media_file)
             else:
-                return read_media(media_file)
+                return media_content
 
         # Concatenate and compile all scripts
         source = u'\n'.join(compile_part(p) for p in media_files)
@@ -202,12 +205,15 @@ def compile_external_css_files(media_files, context, compress_tag=None):
 
         def compile_part(media_file):
             progress[0] += 1
-            context.compile_media_progress_callback(compress_tag, simplify_media_url(media_file), progress[0], len(media_files))
+            media_content = read_media(media_file)
+
+            context.compile_media_progress_callback(compress_tag, simplify_media_url(media_file), progress[0],
+                            len(media_files), len(media_content))
 
             if not is_remote_url(media_file) or context.options.compile_remote_css:
-                return compile_css_string(read_media(media_file), context, get_media_source_from_url(media_file), media_file)
+                return compile_css_string(media_content, context, get_media_source_from_url(media_file), media_file)
             else:
-                return read_media(media_file)
+                return media_content
 
         # concatenate and compile all css files
         source = u'\n'.join(compile_part(p) for p in media_files)

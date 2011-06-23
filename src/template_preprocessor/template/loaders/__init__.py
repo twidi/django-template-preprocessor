@@ -12,6 +12,7 @@ from django.utils.importlib import import_module
 from django.template import StringOrigin
 
 from template_preprocessor.core import compile
+from template_preprocessor.core.context import Context
 from template_preprocessor.utils import get_options_for_path, execute_precompile_command
 
 import os
@@ -26,7 +27,10 @@ _OVERRIDE_OPTIONS_FOR_VALIDATION = [
         'no-pack-external-javascript'
         ]
 
-_OVERRIDE_OPTIONS_AT_RUNTIME_PROCESSED = [ ]
+_OVERRIDE_OPTIONS_AT_RUNTIME_PROCESSED = [
+        'no-pack-external-css',
+        'no-pack-external-javascript'
+        ]
 
 
 class _Base(BaseLoader):
@@ -34,6 +38,7 @@ class _Base(BaseLoader):
 
     def __init__(self, loaders):
         self._loaders = loaders
+        self._cached_loaders = []
 
     @property
     def loaders(self):
@@ -66,9 +71,7 @@ class PreprocessedLoader(_Base):
 
     def __init__(self, loaders):
         _Base.__init__(self, loaders)
-
         self.template_cache = {}
-        self._cached_loaders = []
 
     def load_template(self, template_name, template_dirs=None):
         lang = translation.get_language() or 'en'
@@ -108,9 +111,8 @@ class RuntimeProcessedLoader(_Base):
     """
     Load templates through the preprocessor. Compile at runtime.
     """
-    def __init__(self, loaders):
-        _Base.__init__(self, loaders)
-        self._cached_loaders = []
+    context_class = Context
+    options = _OVERRIDE_OPTIONS_AT_RUNTIME_PROCESSED,
 
     def load_template(self, template_name, template_dirs=None):
         template, origin = self.find_template(template_name, template_dirs)
@@ -121,7 +123,8 @@ class RuntimeProcessedLoader(_Base):
 
         # Compile template
         template, context = compile(template, path=template_name, loader = lambda path: self.find_template(path)[0],
-                        options=get_options_for_path(origin.name) + _OVERRIDE_OPTIONS_AT_RUNTIME_PROCESSED )
+                        options=get_options_for_path(origin.name) + self.options,
+                        context_class=self.context_class)
 
         # Turn into Template object
         template = get_template_from_string(template, origin, template_name)
@@ -129,6 +132,51 @@ class RuntimeProcessedLoader(_Base):
         # Return result
         return template, None
 
+context_cache = {} # TODO
+
+class RuntimeProcessedDebugLoader(RuntimeProcessedLoader):
+    """
+    Load templates through the preprocessor. Compile at runtime and add DEBUG symbols.
+    """
+    class context_class(Context):
+        def __init__(self, *args, **kwargs):
+            kwargs['insert_debug_symbols'] = True
+            Context.__init__(self, *args, **kwargs)
+
+    options = _OVERRIDE_OPTIONS_AT_RUNTIME_PROCESSED + ['no-whitespace-compression']
+
+    def load_template(self, *args, **kwargs):
+        template, origin = RuntimeProcessedLoader.load_template(self, *args, **kwargs)
+
+        # Wrap Template.render by a method which stores the render context in
+        # the cache. (So we can have a webpage automatically render itself
+        # when one of the source files has been changed, through javascript.)
+        original_render = template.render
+        def new_render(context):
+            if not 'template_preprocessor_context_id' in context:
+                context['template_preprocessor_context_id'] = self._store_context(context)
+            return original_render(context)
+        template.render = new_render
+
+        return template, origin
+
+    def _store_context(self, context):
+        """
+        Store this context in the case, and return it's unique id.
+        """
+        #from django.core.cache import cache
+
+        # TODO: Not yet using the real cache. We need
+        # to build a proxy around context, capture every get call, and
+        # meanwhile build a similar dict/list to be used for next rendering call.
+
+        import random, string
+        alphabet = string.ascii_letters
+        key = ''.join([alphabet[random.randint(0, len(string.ascii_letters) - 1)] for __ in range(0, 32)])
+
+        #cache.set('tp-context-cache-%s' % key, context)
+        context_cache['tp-context-cache-%s' % key] = context
+        return key
 
 class ValidatorLoader(_Base):
     """
@@ -137,10 +185,6 @@ class ValidatorLoader(_Base):
     when it fails to. But it still returns a Template object of the original
     template, without any caching.
     """
-    def __init__(self, loaders):
-        _Base.__init__(self, loaders)
-        self._cached_loaders = []
-
     def load_template(self, template_name, template_dirs=None):
         # IMPORTANT NOTE:  We load the template, using the original loaders.
         #                  call compile, but still return the original,
