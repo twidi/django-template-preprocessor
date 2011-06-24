@@ -1398,7 +1398,7 @@ def safe(generator, subject, arg):
     return subject # TODO
 
 @register_native_template_filter('length')
-def safe(generator, subject, arg):
+def length(generator, subject, arg):
     """ {{ var|length}} """
     return 'len(%s)' % subject
 

@@ -215,6 +215,8 @@ def nest_block_level_elements(tree, mappings, _classes=[Token], check=None):
         # End of this block-level tag
         elif moving_to_node and is_given_class and check_value == tags_stack[-1][-1]:
             tree.children.remove(c)
+            if hasattr(moving_to_node[-1], 'register_end_node'):
+                moving_to_node[-1].register_end_node(c)
 
             # Block-level tag created, apply recursively
             # No, we shouldn't!!! Child nodes of this tag are already processed

@@ -273,13 +273,23 @@ class DjangoUrlTag(DjangoTag):
     """
     def process_params(self, params):
         self.url_params = params[1:]
+        self._preprocess = None
 
-    def output(self, handler):
+    def original_output(self, handler):
         handler(u'{%url ')
         for c in self.url_params:
             handler(c)
             handler(u' ')
         handler(u'%}')
+
+    def output(self, handler):
+        if self._preprocess:
+            handler(self._preprocess)
+        else:
+            self.original_output(handler)
+
+    def preprocess(self, value):
+        self._preprocess = value
 
 
 class DjangoTransTag(Token):
@@ -600,11 +610,6 @@ class DjangoPreprocessedCallMacro(DjangoContainer):
     def init(self, children):
         self.children = children
 
-class DjangoPreprocessedUrl(DjangoContent):
-    def init(self, url_value, original_urltag):
-        self.children = [ url_value]
-        self.original_urltag = original_urltag
-
 class DjangoPreprocessedVariable(DjangoContent):
     def init(self, var_value):
         self.children = var_value
@@ -831,9 +836,7 @@ def _preprocess_urls(tree):
             name, args, kwargs = parse_url_params(urltag)
             if not 'as' in args:
                 result = reverse(name, args=args, kwargs=kwargs)
-                urltag_copy = deepcopy(urltag)
-                urltag.__class__ = DjangoPreprocessedUrl
-                urltag.init(result, urltag_copy)
+                urltag.preprocess(result)
         except NoReverseMatch, e:
             pass
         except NoLiteraleException, e:

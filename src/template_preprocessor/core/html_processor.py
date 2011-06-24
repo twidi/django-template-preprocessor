@@ -864,7 +864,7 @@ def _nest_all_elements(tree):
             html_tagname = ''
             def process_params(self, params):
                 # Create new node for the opening html tag
-                self._open_tag = HtmlTag()
+                self._open_tag = HtmlTag(name='html-tag')
                 self._open_tag.children = params
 
                 # Copy line/column number information
@@ -876,10 +876,14 @@ def _nest_all_elements(tree):
             def open_tag(self):
                 return self._open_tag
 
+            def register_end_node(self, end_node):
+                """ Called by 'nest_block_level_elements' for registering the end node """
+                self._end_tag = end_node
+
             def output(self, handler):
-                self._open_tag.output(handler)
+                handler(self._open_tag)
                 Token.output(self, handler)
-                handler('</%s>' % name)
+                handler(self._end_tag)
 
         tag_node.__name__ = name
         tag_node.html_tagname = name
@@ -1068,14 +1072,11 @@ class Trace(Token):
 
 class BeforeDjangoTranslatedTrace(Trace): pass
 class AfterDjangoTranslatedTrace(Trace): pass
-class BeforeDjangoPreprocessedUrlTrace(Trace): pass
-class AfterDjangoPreprocessedUrlTrace(Trace): pass
-
 
 def _insert_debug_trace_nodes(tree, context):
     """
     If we need debug symbols. We have to insert a few traces.
-    DjangoTranslated and DjangoPreprocessedUrl will are concidered content
+    DjangoTranslated is concidered content
     during the HTML parsing and will disappear.
     We add a trace before and after this nodes. if they still match after
     HTML parsing (which should unless in bad cases like "<p>{%trans "</p>" %}")
@@ -1089,7 +1090,7 @@ def _insert_debug_trace_nodes(tree, context):
             trans.children.append(after_class(trans_copy))
 
     insert_trace(DjangoTranslated, BeforeDjangoTranslatedTrace, AfterDjangoTranslatedTrace)
-    insert_trace(DjangoPreprocessedUrl, BeforeDjangoPreprocessedUrlTrace, AfterDjangoPreprocessedUrlTrace)
+#    insert_trace(DjangoPreprocessedUrl, BeforeDjangoPreprocessedUrlTrace, AfterDjangoPreprocessedUrlTrace)
 
 
 def _insert_debug_symbols(tree, context):
@@ -1139,23 +1140,33 @@ def _insert_debug_symbols(tree, context):
                 capture_output = []
 
                 def capture(part):
-                    if isinstance(part, HtmlTagPair) or isinstance(part, HtmlTag):
-                        capture_output.append({ 'include': tag_references[part] })
+                    if ((isinstance(part, HtmlTagPair) or isinstance(part, HtmlTag)) and part in tag_references):
+                            capture_output.append({ 'include': tag_references[part] })
 
                     elif isinstance(part, basestring):
                         capture_output.append(part)
 
-                    elif part.name in ('django-tag', 'html-tag-attribute-key', 'html-tag-attribute-value'):
+                    elif part.name in ('django-tag', 'html-tag-attribute-key', 'html-tag-attribute-value',
+                                    'html-tag', 'html-end-tag'):
                         capt, o = create_capture()
-                        part.output(capt)
+
+                        # For {% url %}, be sure to use the original output
+                        # method (ignore preprocessing)
+                        if isinstance(part, DjangoUrlTag):
+                            part.original_output(capt)
+                        else:
+                            part.output(capt)
+
                         capture_output.append({ 'type': part.name, 'content': o })
                     else:
-                        print part.name # TODO: remove
                         part.output(capture)
                 return capture, capture_output
 
             capt, o = create_capture()
             tag.output(capt)
+
+            if isinstance(tag, HtmlTag):
+                o = [{ 'type': 'html-tag', 'content': o }]
 
             apply_source_list.append((tag, json.dumps(o)))
 
@@ -1174,18 +1185,6 @@ def _insert_debug_symbols(tree, context):
         tag.set_html_attribute('d:t', tag.path)
         tag.set_html_attribute('d:l', tag.line)
         tag.set_html_attribute('d:c', tag.column)
-
-        # For every hyperlink, like <a href="{% url ... %}">, add an attribute d:href="...",
-        # where this contains the original url tag, without escaping.
-#        if tag.html_tagname == 'a':
-#            href = tag.html_attributes.get('href', None)
-#
-#            if href:
-#                for url in href.child_nodes_of_class([ DjangoUrlTag ]):
-#                    tag.set_html_attribute('d:href', url.output_as_string())
-#
-#                for url in href.child_nodes_of_class([ DjangoPreprocessedUrl ]):
-#                    tag.set_html_attribute('d:href', url.original_urltag.output_as_string())
 
     for tag in tree.child_nodes_of_class([ HtmlTag ]):
         add_template_info(tag)
