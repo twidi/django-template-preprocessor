@@ -1162,15 +1162,15 @@ def _insert_debug_symbols(tree, context):
 
         # For every hyperlink, like <a href="{% url ... %}">, add an attribute d:href="...",
         # where this contains the original url tag, without escaping.
-        if tag.html_tagname == 'a':
-            href = tag.html_attributes.get('href', None)
-
-            if href:
-                for url in href.child_nodes_of_class([ DjangoUrlTag ]):
-                    tag.set_html_attribute('d:href', url.output_as_string())
-
-                for url in href.child_nodes_of_class([ DjangoPreprocessedUrl ]):
-                    tag.set_html_attribute('d:href', url.original_urltag.output_as_string())
+#        if tag.html_tagname == 'a':
+#            href = tag.html_attributes.get('href', None)
+#
+#            if href:
+#                for url in href.child_nodes_of_class([ DjangoUrlTag ]):
+#                    tag.set_html_attribute('d:href', url.output_as_string())
+#
+#                for url in href.child_nodes_of_class([ DjangoPreprocessedUrl ]):
+#                    tag.set_html_attribute('d:href', url.original_urltag.output_as_string())
 
     for tag in tree.child_nodes_of_class([ HtmlTag ]):
         add_template_info(tag)
