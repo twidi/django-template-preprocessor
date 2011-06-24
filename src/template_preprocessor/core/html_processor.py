@@ -1096,6 +1096,8 @@ def _insert_debug_symbols(tree, context):
     """
     Insert useful debugging information into the template.
     """
+    import json
+
     # Find head/body nodes
     body_node = None
     head_node = None
@@ -1130,19 +1132,32 @@ def _insert_debug_symbols(tree, context):
         # The parent node would contain the source of every child node as
         # well, but we do not want to send the same source 100times to the browser.
         # Therefor we add hooks for every tag, and replace it by pointers.
-
         apply_source_list = [] # (tag, source)
 
         for tag in body_node.child_nodes_of_class([ HtmlTagPair, HtmlTag ]):
-            def output_hook(tag):
-                return '{$ %s $}' % tag_references[tag]
+            def create_capture():
+                capture_output = []
 
-            hooks = {
-                    HtmlTagPair: output_hook,
-                    HtmlTag: output_hook
-                    }
+                def capture(part):
+                    if isinstance(part, HtmlTagPair) or isinstance(part, HtmlTag):
+                        capture_output.append({ 'include': tag_references[part] })
 
-            apply_source_list.append((tag, tag.output_as_string(hook_dict=hooks)))
+                    elif isinstance(part, basestring):
+                        capture_output.append(part)
+
+                    elif part.name in ('django-tag', 'html-tag-attribute-key', 'html-tag-attribute-value'):
+                        capt, o = create_capture()
+                        part.output(capt)
+                        capture_output.append({ 'type': part.name, 'content': o })
+                    else:
+                        print part.name # TODO: remove
+                        part.output(capture)
+                return capture, capture_output
+
+            capt, o = create_capture()
+            tag.output(capt)
+
+            apply_source_list.append((tag, json.dumps(o)))
 
         for tag, source in apply_source_list:
             if isinstance(tag, HtmlTagPair):
