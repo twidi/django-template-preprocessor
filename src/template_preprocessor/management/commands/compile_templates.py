@@ -39,6 +39,10 @@ class Command(BaseCommand):
             Same as the real context class, but override some methods in order to gain
             nice colored output.
             """
+            def __init__(s, *args, **kwargs):
+                kwargs['insert_debug_symbols'] = self.insert_debug_symbols
+                Context.__init__(s, *args, **kwargs)
+
             def compile_media_callback(s, compress_tag, media_files):
                 """
                 When the compiler notifies us that compiling of this file begins.
@@ -53,12 +57,12 @@ class Command(BaseCommand):
                 for m in media_files:
                     print self.colored('   * %s' % m, 'green')
 
-            def compile_media_progress_callback(s, compress_tag, media_file, current, total):
+            def compile_media_progress_callback(s, compress_tag, media_file, current, total, file_size):
                 """
                 Print progress of compiling media files.
                 """
                 print self.colored('       (%s / %s):' % (current, total), 'yellow'),
-                print self.colored(' %s' % (media_file), 'green')
+                print self.colored(' %s (%s bytes)' % (media_file, file_size), 'green')
         self.NiceContext = NiceContext
 
         BaseCommand.__init__(self, *args, **kwargs)
@@ -78,7 +82,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         all_templates = options['all_templates']
         interactive = options['interactive']
-        insert_debug_symbols = options['insert_debug_symbols']
+        self.insert_debug_symbols = options['insert_debug_symbols']
 
         # Default verbosity
         self.verbosity = int(options.get('verbosity', 1))

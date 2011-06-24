@@ -1,0 +1,147 @@
+
+.tp-debug-container {
+        background-color: #000044;
+        color: white;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 5000;
+        width: 100%;
+        margin: 0;
+        padding: 5px;
+    }
+
+.tp-debug-container span {
+    margin: 0 1em; }
+
+
+.tp-wrapper { background-color: #aa6666; margin: 0; padding: 0; }
+.tp-wrapper .tp-template {
+    background-color: #884444 !important;
+    text-align: left !important;
+    line-height: 140% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: white !important;
+    font-size: 11px !important; }
+
+.tp-wrapper .tp-wrapper { background-color: #66aa66 !important; }
+.tp-wrapper .tp-wrapper .tp-template { background-color: #448844 !important; }
+
+.tp-wrapper .tp-wrapper .tp-wrapper { background-color: #6666aa !important; }
+.tp-wrapper .tp-wrapper .tp-wrapper .tp-template { background-color: #444488 !important; }
+
+.tp-source {
+    opacity: .9;
+    -webkit-opacity: .9;
+    position: fixed;
+    width: 80%;
+    height: auto;
+    top: 50px;
+    left: 50px;
+    background-color: white;
+    color: black;
+    border: 1px solid #8888ff;
+    z-index: 5000;
+    font-size: 12px;
+    font-family: "Arial", "helvetica"; /* "Courier New", monospace; */
+    line-height: 140%;
+}
+.tp-source .tp-source-header {
+    font-size: 14px;
+    background-color: #aaaabb;
+    border-bottom: 1px solid 000044;
+    margin: 0;
+    padding: 3px;
+}
+.tp-source pre {
+    overflow: auto;
+    height: 400px;
+}
+
+.tp-source pre span {
+    cursor: default;
+}
+.tp-source .tp-source-footer {
+    text-align: right;
+    height: 40px;
+    margin: 0;
+    border-top: 1px solid 000044;
+    background-color: white;
+}
+
+
+.tp-external-source .tp-source {
+    position: static !important;
+    width: auto;
+    border: none;
+}
+.tp-external-source .tp-source pre {
+    height: auto !important;
+    margin-bottom: 40px;
+    margin-top: 40px;
+    overflow: visible;
+}
+.tp-external-source .tp-source-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+}
+.tp-external-source .tp-source-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+
+.tp-expand-button {
+    border: 1px solid #ffbbbb;
+    color: #aaaaaa;
+    margin: 4px;
+    padding: 1px;
+    cursor: pointer;
+    cursor: hand;
+}
+.tp-expand-button:hover {
+    background-color: #ff0000;
+    color: black;
+}
+
+.tp-type-django-tag {
+    color: #008800;
+    font-weight: bold;
+}
+
+
+.tp-type-html-tag, .tp-type-html-end-tag {
+    color: #880000;
+    font-weight: bold;
+}
+
+.tp-type-html-tag-attribute-key {
+    color: #000088;
+    font-weight: bold;
+}
+
+.tp-type-html-tag-attribute-value {
+    color: #000088;
+    font-style: italic;
+}
+
+.tp-node-not-rendered {
+    font-style: italic;
+    color: #666666;
+}
+
+.tp-highlight-source, .tp-highlight-source * {
+    background-color: #ddddff !important;
+}
+.tp-highlight-html, .tp-highlight-html * {
+    background-color: #ddddff !important;
+    color: black !important;
+    background-image: none;
+}
+
