@@ -1114,10 +1114,11 @@ def _insert_debug_symbols(tree, context):
     tag_references = { }
 
     def create_references():
-        ref_counter = [0]
-        for tag in body_node.child_nodes_of_class([ HtmlTagPair, HtmlTag ]):
-                tag_references[tag] = ref_counter[0]
-                ref_counter[0] += 1
+        if body_node:
+            ref_counter = [0]
+            for tag in body_node.child_nodes_of_class([ HtmlTagPair, HtmlTag ]):
+                    tag_references[tag] = ref_counter[0]
+                    ref_counter[0] += 1
     create_references()
 
     def apply_tag_refences():
@@ -1180,7 +1181,6 @@ def _insert_debug_symbols(tree, context):
     #  d:t="template.html"
     #  d:l="line_number"
     #  d:c="column_number"
-    #  d:href="{% url ... %}"
     def add_template_info(tag):
         tag.set_html_attribute('d:t', tag.path)
         tag.set_html_attribute('d:l', tag.line)
@@ -1228,7 +1228,6 @@ def _insert_debug_symbols(tree, context):
 #  TODO: don't place string inside custom tags, as that can destroy the CSS
 #  layout very much, but add these properties to an attribute of the parent
 #  node, somewhere... OR! bring both the beginning and end markers to the
-#  client, like <tp:trans-start ...></tp:trans-start> ..... <tp:trans-end></tp:trans-end>
 
     # For every <html> node, insert a <script>-node at the end, which points
     # to the debug script of the preprocessor for handling this information.

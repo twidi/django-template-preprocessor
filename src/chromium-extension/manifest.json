@@ -6,19 +6,17 @@
     "default_icon": "icon.png",
     "popup": "popup.html"
   },
-  "permissions": [ 
-    "http://api.flickr.com/services/rest/",
+  "permissions": [
       "contextMenus",
-      //"experimental",
       "contentSettings",
       "tabs"
       ],
   "content_scripts": [
-      {
-        "matches": ["http://*/*"],
-        "js": ["jquery.min.js", "content-script.js"],
-        "css": ["content.css"]
-    }
+          {
+            "matches": ["http://*/*"],
+            "js": ["jquery.min.js", "content-script.js"],
+            "css": ["content.css"]
+          }
       ],
   "background_page": "background.html"
 }

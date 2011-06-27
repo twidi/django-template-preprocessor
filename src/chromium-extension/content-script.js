@@ -1,8 +1,8 @@
 (function($) {
     function create_highlighter(classname)
-    {   
+    {
         var last_overlays= undefined;
-    
+
         function _highlight(element) {
             $('.tp-highlight-overlay').remove();
 
@@ -24,7 +24,7 @@
             });
         }
         return _highlight;
-    }   
+    }
     var highlighter = create_highlighter('tp-highlight');
 
 
@@ -82,6 +82,28 @@
         return $('*[d\\:ref=' + ref_number + ']');
     }
 
+    function getElementInfo(element)
+    {
+        return {
+                "template": element.attr('d:t'),
+                "line": element.attr('d:l'),
+                "column": element.attr('d:c'),
+                "ref": element.attr('d:ref'),
+                "tagname": (element.get(0) ? element.get(0).tagName.toLowerCase() : undefined),
+            };
+    }
+
+    // Returns an array of the ref ids of the parents of this node
+    function getParents(element)
+    {
+        var parents = [];
+        element.parents().each(function() {
+                if ($(this).attr('d:ref'))
+                    parents.push($(this).attr('d:ref'));
+                });
+        return parents;
+    }
+
     chrome.extension.onRequest.addListener(function(request, sender, sendResponse) {
             if(request['action'] == "highlight-template-parts")
             {
@@ -91,13 +113,7 @@
             else if (request['action'] == 'get-template-info')
             {
                 if (current_element)
-                    sendResponse({
-                            "template": current_element.attr('d:t'),
-                            "line": current_element.attr('d:l'),
-                            "column": current_element.attr('d:c'),
-                            "ref": current_element.attr('d:ref'),
-                            "tagname": (current_element.get(0) ? current_element.get(0).tagName.toLowerCase() : undefined),
-                    });
+                    sendResponse(getElementInfo(current_element));
                 else
                     sendResponse({ });
             }
@@ -106,6 +122,23 @@
                 var ref = get_ref(request['ref']);
                 if (ref.length)
                     sendResponse($.parseJSON(ref.eq(0).attr('d:s')));
+                else
+                    sendResponse({ });
+            }
+            else if (request['action'] == 'get-ref-info')
+            {
+                var ref = get_ref(request['ref']);
+                if (ref.length)
+                    sendResponse(getElementInfo(ref.eq(0)));
+                else
+                    sendResponse({ });
+
+            }
+            else if (request['action'] == 'get-ref-parents')
+            {
+                var ref = get_ref(request['ref']);
+                if (ref.length)
+                    sendResponse(getParents(ref.eq(0)));
                 else
                     sendResponse({ });
             }
@@ -120,5 +153,4 @@
             else
                 sendResponse({ });
     });
-
 })(jQuery);
