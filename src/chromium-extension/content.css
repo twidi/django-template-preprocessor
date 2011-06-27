@@ -1,0 +1,22 @@
+
+.tp-highlight, .tp-highlight * {
+    background-color: #ccccff !important;
+	background-image: none !important;
+	color: black !important;
+}
+
+.tp-wrapper { background-color: #aa6666; margin: 0; padding: 0; }
+.tp-wrapper .tp-template {
+    background-color: #884444 !important;
+    text-align: left !important;
+    line-height: 140% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: white !important;
+    font-size: 11px !important; }
+
+.tp-wrapper .tp-wrapper { background-color: #66aa66 !important; }
+.tp-wrapper .tp-wrapper .tp-template { background-color: #448844 !important; }
+
+.tp-wrapper .tp-wrapper .tp-wrapper { background-color: #6666aa !important; }
+.tp-wrapper .tp-wrapper .tp-wrapper .tp-template { background-color: #444488 !important; }

@@ -1,0 +1,24 @@
+{
+  "name": "Django Template Debugger (City Live)",
+  "version": "0.1",
+  "description": "Developer extension for debugging Django rendered templates.",
+  "browser_action": {
+    "default_icon": "icon.png",
+    "popup": "popup.html"
+  },
+  "permissions": [ 
+    "http://api.flickr.com/services/rest/",
+      "contextMenus",
+      //"experimental",
+      "contentSettings",
+      "tabs"
+      ],
+  "content_scripts": [
+      {
+        "matches": ["http://*/*"],
+        "js": ["jquery.min.js", "content-script.js"],
+        "css": ["content.css"]
+    }
+      ],
+  "background_page": "background.html"
+}
