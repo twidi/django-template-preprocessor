@@ -205,7 +205,6 @@
                     return false;
                 });
 
-
             // Set title attribute
             getRefInfo(tab, ref, function(data) {
                     span.attr('title', data['template'] + ' (line ' + data['line'] +
@@ -285,6 +284,10 @@
                     var s = $('<span/>');
                     s.click(function(){
                         viewRefSource(tab, ref);
+                        return false;
+                    });
+                    s.mouseover(function() {
+                        highlightRef(tab, ref);
                         return false;
                     });
                     getRefInfo(tab, ref, function(data) {
