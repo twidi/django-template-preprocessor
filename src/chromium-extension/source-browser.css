@@ -1,5 +1,5 @@
 
-.tp-debug-container {
+.debug-container {
         background-color: #000044;
         color: white;
         position: fixed;
@@ -12,11 +12,11 @@
         padding: 5px;
     }
 
-.tp-debug-container span {
+.debug-container span {
     margin: 0 1em; }
 
 
-.tp-source {
+.source {
     opacity: .9;
     -webkit-opacity: .9;
     height: auto;
@@ -29,7 +29,7 @@
     font-family: "Arial", "helvetica"; /* "Courier New", monospace; */
     line-height: 140%;
 }
-.tp-source .tp-source-header {
+.source .source-header {
     font-size: 14px;
     background-color: #dddddd;
     color: #333333;
@@ -42,15 +42,15 @@
     left: 0;
     right: 0;
 }
-.tp-source pre {
+.source pre {
     margin-bottom: 50px;
     margin-top: 50px;
 }
 
-.tp-source pre span {
+.source pre span {
     cursor: default;
 }
-.tp-source .tp-source-footer {
+.footer {
     text-align: right;
     height: 40px;
     margin: 0;
@@ -64,7 +64,7 @@
 }
 
 
-.tp-expand-button {
+.expand-button {
     border: 1px solid #ffbbbb;
     color: #aaaaaa;
     margin: 4px;
@@ -72,41 +72,41 @@
     cursor: pointer;
     cursor: hand;
 }
-.tp-expand-button:hover {
+.expand-button:hover {
     background-color: #ff0000;
     color: black;
 }
 
-.tp-type-django-tag {
+.type-django-tag {
     color: #008800;
     font-weight: bold;
 }
 
 
-.tp-type-html-tag, .tp-type-html-end-tag {
+.type-html-tag, .type-html-end-tag {
     color: #880000;
     font-weight: bold;
 }
 
-.tp-type-html-tag-attribute-key {
+.type-html-tag-attribute-key {
     color: #000088;
     font-weight: bold;
 }
 
-.tp-type-html-tag-attribute-value {
+.type-html-tag-attribute-value {
     color: #000088;
     font-style: italic;
 }
 
-.tp-node-not-rendered {
+.node-not-rendered {
     font-style: italic;
     color: #666666;
 }
 
-.tp-highlight-source, .tp-highlight-source * {
+.highlight-source, .highlight-source * {
     background-color: #ddddff !important;
 }
-.tp-highlight-html, .tp-highlight-html * {
+.highlight-html, .highlight-html * {
     background-color: #ddddff !important;
     background-image: none;
 }

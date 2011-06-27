@@ -64,12 +64,11 @@
     $('*').mouseover(function() {
         if ($(this).attr('d:s'))
         {
+            // Remember element
             current_element = $(this);
 
-            // TODO Don't do highlighting here: pass the hover event to the source browser, and have it callback
-            var refNumber = $(this).attr('d:ref');
-
-//            highlighter(get_ref(refNumber));
+            // Remove all highlighting
+            highlighter($());
 
             return false;
         }
@@ -123,7 +122,7 @@
                 if (ref.length)
                     sendResponse($.parseJSON(ref.eq(0).attr('d:s')));
                 else
-                    sendResponse({ });
+                    sendResponse([ ]);
             }
             else if (request['action'] == 'get-ref-info')
             {
@@ -132,7 +131,6 @@
                     sendResponse(getElementInfo(ref.eq(0)));
                 else
                     sendResponse({ });
-
             }
             else if (request['action'] == 'get-ref-parents')
             {
