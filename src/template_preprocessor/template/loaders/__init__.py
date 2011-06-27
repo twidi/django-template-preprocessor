@@ -31,6 +31,11 @@ _OVERRIDE_OPTIONS_AT_RUNTIME_PROCESSED = [
         'no-pack-external-css',
         'no-pack-external-javascript'
         ]
+_OVERRIDE_OPTIONS_AT_DEBUG = [
+        'no-pack-external-css',
+        'no-pack-external-javascript',
+        'no-whitespace-compression'
+        ]
 
 
 class _Base(BaseLoader):
@@ -112,7 +117,7 @@ class RuntimeProcessedLoader(_Base):
     Load templates through the preprocessor. Compile at runtime.
     """
     context_class = Context
-    options = _OVERRIDE_OPTIONS_AT_RUNTIME_PROCESSED,
+    options = _OVERRIDE_OPTIONS_AT_RUNTIME_PROCESSED
 
     def load_template(self, template_name, template_dirs=None):
         template, origin = self.find_template(template_name, template_dirs)
@@ -134,16 +139,17 @@ class RuntimeProcessedLoader(_Base):
 
 context_cache = {} # TODO
 
-class RuntimeProcessedDebugLoader(RuntimeProcessedLoader):
+class DebugLoader(RuntimeProcessedLoader):
     """
-    Load templates through the preprocessor. Compile at runtime and add DEBUG symbols.
+    Load templates through the preprocessor. Does validation, compiles and inserts
+    debug symbol. (For use with browser extensions.)
     """
     class context_class(Context):
         def __init__(self, *args, **kwargs):
             kwargs['insert_debug_symbols'] = True
             Context.__init__(self, *args, **kwargs)
 
-    options = _OVERRIDE_OPTIONS_AT_RUNTIME_PROCESSED + ['no-whitespace-compression']
+    options = _OVERRIDE_OPTIONS_AT_DEBUG
 
     def load_template(self, *args, **kwargs):
         template, origin = RuntimeProcessedLoader.load_template(self, *args, **kwargs)

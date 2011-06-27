@@ -866,9 +866,25 @@ def _preprocess_trans_tags(tree):
     """
     convert_var = lambda v: '%%(%s)s' % v
 
+    def process_blocktrans(trans):
+        # Return True when this {% blocktrans %} contains assignments
+        # like {% blocktrans with key=value and key2=value2 %} or
+        # {% blocktrans with value as key and value2 as key2 %}
+        #
+        # TODO: adjust this method to be able to preprocess these as well.
+        #       ({% with %} syntax is not completely compatible between Django
+        #       1.2 and 1.3. Django 1.2 does not support with statements with
+        #       multiple parameters.
+        if isinstance(trans, DjangoBlocktransTag):
+            params = ' '.join(map(lambda t: t.output_as_string(), trans.params))
+            return not 'and' in params and not '=' in params
+        else:
+            return True
+
+
     for trans in tree.child_nodes_of_class([ DjangoTransTag, DjangoBlocktransTag ]):
         # Process {% blocktrans %}
-        if isinstance(trans, DjangoBlocktransTag):
+        if isinstance(trans, DjangoBlocktransTag) and process_blocktrans(trans):
             translation_info = trans.translation_info
 
             # Translate strings
