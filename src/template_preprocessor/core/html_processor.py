@@ -1232,11 +1232,11 @@ def _insert_debug_symbols(tree, context):
 
     # For every <html> node, insert a <script>-node at the end, which points
     # to the debug script of the preprocessor for handling this information.
-    if body_node:
-        body_node.children.append('<script type="text/javascript" src="/static/template_preprocessor/js/debug.js"></script>')
+#    if body_node:
+#        body_node.children.append('<script type="text/javascript" src="/static/template_preprocessor/js/debug.js"></script>')
 
-    if head_node:
-        head_node.children.append('<link type="text/css" rel="stylesheet" href="/static/template_preprocessor/css/debug.css" />')
+#    if head_node:
+#        head_node.children.append('<link type="text/css" rel="stylesheet" href="/static/template_preprocessor/css/debug.css" />')
 
     # Add {{ template_preprocessor_context_id }} variable to body.
     # If this variable exist in the context during rendering, it means that
