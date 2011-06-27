@@ -71,6 +71,8 @@
     padding: 1px;
     cursor: pointer;
     cursor: hand;
+
+    display:none; /* For now, hide the expand buttons */
 }
 .expand-button:hover {
     background-color: #ff0000;

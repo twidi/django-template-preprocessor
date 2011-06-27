@@ -229,7 +229,7 @@
                         (function(refNumber) {
                             // Create child
                             var child = $('<span class="child" />');
-                            child.attr('d:ref', refNumber);
+                            child.attr('d:r', refNumber);
 
                             // source code
                             getRefObject(tab, refNumber, function(response) {
@@ -315,7 +315,10 @@
     {
         getCurrentRefInfo(tab, function(response) {
             var ref = response['ref'];
-            viewRefSource(tab, ref);
+            if (ref)
+                viewRefSource(tab, ref);
+            else
+                alert('No Django Template debug symbols found');
         });
     }
 

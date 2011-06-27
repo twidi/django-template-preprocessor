@@ -1114,19 +1114,18 @@ def _insert_debug_symbols(tree, context):
     tag_references = { }
 
     def create_references():
-        if body_node:
-            ref_counter = [0]
-            for tag in body_node.child_nodes_of_class([ HtmlTagPair, HtmlTag ]):
-                    tag_references[tag] = ref_counter[0]
-                    ref_counter[0] += 1
+        ref_counter = [0]
+        for tag in tree.child_nodes_of_class([ HtmlTagPair, HtmlTag ]):
+                tag_references[tag] = ref_counter[0]
+                ref_counter[0] += 1
     create_references()
 
     def apply_tag_refences():
         for tag, ref_counter in tag_references.items():
             if isinstance(tag, HtmlTagPair):
-                tag.open_tag.set_html_attribute('d:ref', ref_counter)
+                tag.open_tag.set_html_attribute('d:r', ref_counter)
             else:
-                tag.set_html_attribute('d:ref', ref_counter)
+                tag.set_html_attribute('d:r', ref_counter)
 
     # Add template source of this node as an attribute of it's own node.
     # Only for block nodes inside <body/>
@@ -1136,7 +1135,7 @@ def _insert_debug_symbols(tree, context):
         # Therefor we add hooks for every tag, and replace it by pointers.
         apply_source_list = [] # (tag, source)
 
-        for tag in body_node.child_nodes_of_class([ HtmlTagPair, HtmlTag ]):
+        for tag in [body_node] + list(body_node.child_nodes_of_class([ HtmlTagPair, HtmlTag ])):
             def create_capture():
                 capture_output = []
 

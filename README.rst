@@ -46,19 +46,19 @@ Add this to your settings.py:
     LANGUAGES = (
          ('en', 'EN'),
     )
-    
+
     # Define directories
     MEDIA_ROOT = ROOT + 'media/'
     MEDIA_URL = '/media/'
     MEDIA_CACHE_DIR = MEDIA_ROOT + 'cache/'
     MEDIA_CACHE_URL = MEDIA_URL + 'cache/'
     TEMPLATE_CACHE_DIR = ROOT + 'templates/cache/'
-    
+
     # Wrap template loaders
     if DEBUG:
         TEMPLATE_LOADERS = (
-            #('template_preprocessor.template.loaders.ValidatorLoader',
-            ('template_preprocessor.template.loaders.RuntimeProcessedLoader',
+            ('template_preprocessor.template.loaders.ValidatorLoader',
+            #('template_preprocessor.template.loaders.RuntimeProcessedLoader',
                 TEMPLATE_LOADERS
             ),
         )
@@ -68,7 +68,7 @@ Add this to your settings.py:
                 TEMPLATE_LOADERS
             ),
         )
-    
+
     # Applications
     INSTALLED_APPS += ( 'template_preprocessor', )
 
@@ -86,7 +86,7 @@ specific options. Add the following to your settings.py
     TEMPLATE_PREPROCESSOR_OPTIONS = {
             # Default settings
             '*', ('html', 'whitespace-compression', ),
-    
+
             # Override for specific applications
             ('django.contrib.admin', 'django.contrib.admindocs', 'debug_toolbar'): ('no-html',),
     }
@@ -150,7 +150,7 @@ Additional recommendations
 ::
 
     <script type="text/javascript">
-        // <![CDATA[ 
+        // <![CDATA[
         ...alert('<div>');
         // ]]>
     </script>
@@ -233,10 +233,34 @@ In this file, write template tags like:
     def my_custom_tag(*args):
         return 'This is the output of my custom template tag'
 
-    
+
 Every call of ``{% my_custom_tag %}`` will now be replaced by the output of this
 tag.  Also, don't forget to register normal template tags in Django, in case
 you don't use the template preprocessor.
+
+
+Using the Chromium (Google Chrome) extension
+--------------------------------------------------------
+
+The template preprocessor has the option of adding debug symbols to the
+template which can be used by a web browser extension. It is for instance
+possible to view which Django template code was used for rendering any part in
+the webpage.
+
+Use the following template loader in your settings.py:
+
+::
+
+    'template_preprocessor.template.loaders.DebugLoader'
+
+
+The ``src/chromium-extension`` folder in the template_preprocessor repository
+contains the unpacked plugin for the Chromium webbrowser.
+
+After loading the plugin, go to a webpage that is rendered through the
+DebugLoader, right click anywhere on the webpage, and click "View Django
+Source Code". Now you can interactively see the match between the original
+template and the rendered output.
 
 
 More information?
