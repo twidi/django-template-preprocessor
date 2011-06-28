@@ -136,6 +136,11 @@
         footer.append(openInEditorButton);
         openInEditorButton.click(function() { alert("TODO: not yet implemented"); });
 
+        // Close button
+        var closeButton = $('<input type="button" value="Close" />');
+        footer.append(closeButton);
+        closeButton.click(function() { w.close(); });
+
         container.append(title_bar);
         container.append(this.source_container);
         container.append(footer);

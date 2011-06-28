@@ -19,6 +19,7 @@ from template_preprocessor.core.utils import check_external_file_existance, is_r
 
 from copy import deepcopy
 from django.conf import settings
+from django.utils.translation import ugettext as _, ungettext
 
 import codecs
 import os
@@ -1192,58 +1193,37 @@ def _insert_debug_symbols(tree, context):
         add_template_info(tag.open_tag)
 
     # Surround every {% trans %} block which does not appear into Javascript or Css
-    # by <span d:l="..." d:c="..." d:o="original_string..." ...>
-    # Note that we can do this only when the traces before and after {% trans %}
-    # are still matching. This is only when the HTML parser did not mess up
-    # the parse tree like in: "<p>{% trans "</p>" %}"
-    def find_matching_traces(tree, is_inline=False):
+    # by <e:tr d:l="..." d:c="..." d:s="original_string..." ...></e:tr>
+    # and <e:etr></e:etr>
+    # ** Note that we don't place the string itself in a html tag, but instead
+    # use two pairs of HTML tags. This is because otherwise, this could
+    # destroy the CSS layout. It is up to the Javascript to detect the text
+    # node in between and attach eventhandlers to these.
+    def insert_trans_tags(tree):
         last_trace = None
 
         for node in tree.children:
-            if (last_trace and isinstance(last_trace, BeforeDjangoTranslatedTrace) and
-                        isinstance(node, AfterDjangoTranslatedTrace) and last_trace.original_node == node.original_node):
+            if isinstance(node, BeforeDjangoTranslatedTrace):
                 original_node = node.original_node
-                tagname = 'tp:trans'
-                last_trace.children = [ '<%s tp:c="%s" tp:l="%s" tp:t="%s" tp:s="%s">' % (
-                            tagname,
-                            original_node.column, original_node.line, original_node.path,
-                            xml_escape(original_node.translation_info.string)
-                            ) ]
-                node.children = [ '</%s>' % tagname ]
+                node.children = ['<d:tr d:l="%s" d:c="%s" d:t="%s" d:s="%s" d:tr="%s"></d:tr>' %
+                                    tuple(map(xml_escape, (
+                                        original_node.line,
+                                        original_node.column,
+                                        original_node.path,
+                                        original_node.translation_info.string,
+                                        _(original_node.translation_info.string),
+                                        )))]
 
-            if isinstance(node, Trace):
-                last_trace = node
+            elif isinstance(node, AfterDjangoTranslatedTrace):
+                node.children = ['<d:etr></d:etr>']
 
             # Recursively find matching traces in
-            if isinstance(node, HtmlTagPair):
-                find_matching_traces(node, is_inline or node.open_tag.is_inline)
+            elif isinstance(node, Token) and not any(isinstance(node, c)
+                                    for c in (Trace, HtmlScriptNode, HtmlStyleNode, HtmlTag)):
+                insert_trans_tags(node)
 
-            elif isinstance(node, Token) and not any(isinstance(node, c) for c in (Trace, HtmlScriptNode, HtmlStyleNode, HtmlTag)):
-                find_matching_traces(node, is_inline)
-
-#    if body_node:
-#        find_matching_traces(body_node)
-
-#  TODO: don't place string inside custom tags, as that can destroy the CSS
-#  layout very much, but add these properties to an attribute of the parent
-#  node, somewhere... OR! bring both the beginning and end markers to the
-
-    # For every <html> node, insert a <script>-node at the end, which points
-    # to the debug script of the preprocessor for handling this information.
-#    if body_node:
-#        body_node.children.append('<script type="text/javascript" src="/static/template_preprocessor/js/debug.js"></script>')
-
-#    if head_node:
-#        head_node.children.append('<link type="text/css" rel="stylesheet" href="/static/template_preprocessor/css/debug.css" />')
-
-    # Add {{ template_preprocessor_context_id }} variable to body.
-    # If this variable exist in the context during rendering, it means that
-    # the context will be remained in cache by the template loader, and that
-    # javascript can do a reload call to automatically reload the page on
-    # the first change in any related source file.
     if body_node:
-        body_node.children.append('<span style="display:none;" class="tp-context-id">' +
-                        '{{ template_preprocessor_context_id }}</span>')
+        insert_trans_tags(body_node)
 
     # Apply tag references as attributes now. (The output could be polluted if we did this earlier)
     apply_tag_refences()
