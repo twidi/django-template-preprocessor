@@ -9,7 +9,8 @@
   "permissions": [
       "contextMenus",
       "contentSettings",
-      "tabs"
+      "tabs",
+      "http://localhost:8900/"
       ],
   "content_scripts": [
           {

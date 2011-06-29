@@ -114,6 +114,7 @@
 
     function sourceBrowser() {
         var w = createWindow();
+        var currentTemplate = undefined;
 
         // Create source container
         var container = $('<pre class="source"/>');
@@ -134,7 +135,14 @@
         // Open in editor button
         var openInEditorButton = $('<input type="button" value="Open in editor" />');
         footer.append(openInEditorButton);
-        openInEditorButton.click(function() { alert("TODO: not yet implemented"); });
+        openInEditorButton.click(function() {
+                $.ajax({
+                    'url': "http://localhost:8900/?template=" + encodeURIComponent(currentTemplate),
+                    //'error': function(data) { q=data; alert("Failed to contact API. Did you run: './manage.py open_in_editor_server'"); },
+                    //'success': function(data) { alert(data); },
+                    'dataType': 'jsonp'
+                });
+            });
 
         // Close button
         var closeButton = $('<input type="button" value="Close" />');
@@ -149,6 +157,8 @@
         $(w.document).find('body').append(container);
 
         this.showElement = function(tab, info, breadcrumbs, element) {
+            currentTemplate = info["template"];
+
             this.source_container.empty();
             this.source_container.append(element);
 
