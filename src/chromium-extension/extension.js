@@ -115,6 +115,8 @@
     function sourceBrowser() {
         var w = createWindow();
         var currentTemplate = undefined;
+        var currentLine = undefined;
+        var currentColumn = undefined;
 
         // Create source container
         var container = $('<pre class="source"/>');
@@ -136,8 +138,10 @@
         var openInEditorButton = $('<input type="button" value="Open in editor" />');
         footer.append(openInEditorButton);
         openInEditorButton.click(function() {
+                // Do GET request to server for opening file in editor.
                 $.ajax({
-                    'url': "http://localhost:8900/?template=" + encodeURIComponent(currentTemplate),
+                    'url': "http://localhost:8900/?template=" + encodeURIComponent(currentTemplate) +
+                                    "&line=" + encodeURIComponent(currentLine) + "&column=" + encodeURIComponent(currentColumn),
                     //'error': function(data) { q=data; alert("Failed to contact API. Did you run: './manage.py open_in_editor_server'"); },
                     //'success': function(data) { alert(data); },
                     'dataType': 'jsonp'
@@ -158,6 +162,8 @@
 
         this.showElement = function(tab, info, breadcrumbs, element) {
             currentTemplate = info["template"];
+            currentLine = info["line"];
+            currentColumn = info["column"];
 
             this.source_container.empty();
             this.source_container.append(element);
