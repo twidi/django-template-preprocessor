@@ -262,6 +262,12 @@ DebugLoader, right click anywhere on the webpage, and click "View Django
 Source Code". Now you can interactively see the match between the original
 template and the rendered output.
 
+To be able to use the *open in editor* functionality, run the following server
+from the command line:
+
+::
+    ./manage.py open_in_editor_server
+
 
 More information?
 -----------------
