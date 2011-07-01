@@ -16,7 +16,7 @@
                     'height': $(this).outerHeight()
                     });
                 // Add tagname label above highlighting.
-                $(body).append(
+                $('body').append(
                         $('<p class="tp-label"/>')
                         .text('<' + $(this).get(0).tagName.toLowerCase() + ' />')
                         .css({

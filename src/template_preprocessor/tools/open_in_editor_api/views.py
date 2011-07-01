@@ -18,10 +18,13 @@ def open_in_editor(request):
 
     # Call command for opening this file
     if hasattr(settings, 'TEMPLATE_PREPROCESSOR_OPEN_IN_EDITOR_COMMAND'):
-        settings.TEMPLATE_PREPROCESSOR_OPEN_IN_EDITOR_COMMAND(path)
+        settings.TEMPLATE_PREPROCESSOR_OPEN_IN_EDITOR_COMMAND(path, line, column)
     else:
-        subprocess.Popen(["/usr/bin/gvim", "--remote-tab", path ])
-        time.sleep(0.1)
+        # By default, open this file in GVim, in a new tab.
+        subprocess.Popen(["/usr/bin/gvim"])
+        #subprocess.Popen(["/usr/bin/gvim", "--remote-tab", path ])
+        time.sleep(0.4)
+        subprocess.Popen(["/usr/bin/gvim", "--remote-send", "<ESC>:tabe %s<ENTER>" % path ])
         subprocess.Popen(["/usr/bin/gvim", "--remote-send", "<ESC>:%s<ENTER>%s|" % (line, column)])
 
     return HttpResponse('[{ "result": "ok" }]', mimetype="application/javascript")
