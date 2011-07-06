@@ -765,7 +765,7 @@ def _preprocess_decorate_tags(tree, context):
             block.init([ include_tree ])
 
         except TemplateDoesNotExist, e:
-            raise CompileException(self, 'Template in {% decorate %} tag not found (%s)' % block.template_name)
+            raise CompileException(block, 'Template in {% decorate %} tag not found (%s)' % block.template_name)
 
 
 def _group_all_loads(tree):
