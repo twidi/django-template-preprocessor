@@ -12,7 +12,19 @@ MEDIA_ROOT = settings.MEDIA_ROOT
 MEDIA_CACHE_DIR = settings.MEDIA_CACHE_DIR
 MEDIA_CACHE_URL = settings.MEDIA_CACHE_URL
 MEDIA_URL = settings.MEDIA_URL
-STATIC_URL = getattr(settings, 'STATIC_URL', '')
+STATIC_ROOT = getattr(settings, 'STATIC_ROOT', '')
+STATIC_URL = getattr(settings, 'STATIC_URL', None)
+
+
+try:
+    from django.contrib.staticfiles.finders import find
+except ImportError:
+    # fall back to django-staticfiles
+    try:
+        from staticfiles.finders import find
+    except ImportError:
+        def find(url):
+            return os.path.join(STATIC_ROOT, url)
 
 
 # =======[ Utilities for media/static files ]======
@@ -25,7 +37,6 @@ def get_media_source_from_url(url):
     """
     For a given media/static URL, return the matching full path in the media/static directory
     """
-    from django.contrib.staticfiles.finders import find
 
     # Media
     if MEDIA_URL and url.startswith(MEDIA_URL):
