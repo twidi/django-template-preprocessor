@@ -928,7 +928,7 @@ def _preprocess_trans_tags(tree):
             trans.init(output, translation_info)
 
         # Process {% trans "..." %}
-        else:
+        elif isinstance(trans, DjangoTransTag):
             if not trans.is_variable:
                 output = _(trans.string)
                 translation_info = trans.translation_info
