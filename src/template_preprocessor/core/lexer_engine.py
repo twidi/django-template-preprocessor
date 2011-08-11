@@ -161,7 +161,7 @@ def nest_block_level_elements(tree, mappings, _classes=[Token], check=None):
 
     # Push/Pop stacks
     moving_to_node = []
-    list_index = 0
+    moving_to_index = []
     tags_stack = [] # Stack of lists (top of the list contains a list of
                 # check_values for possible {% else... %} or {% end... %}-nodes.
 
@@ -174,7 +174,7 @@ def nest_block_level_elements(tree, mappings, _classes=[Token], check=None):
         moving to.
         """
         node = moving_to_node[-1]
-        index = str(list_index) if list_index else ''
+        index = str(moving_to_index[-1] + 1) if moving_to_index[-1] else ''
 
         if not hasattr(node, 'children%s' % index):
             setattr(node, 'children%s' % index, [])
@@ -194,8 +194,6 @@ def nest_block_level_elements(tree, mappings, _classes=[Token], check=None):
             m = mappings[check(c)]
             (end, class_) = (m[:-1], m[-1])
 
-            child_list_index = 0
-
             # Patch class
             c.__class__ = class_
 
@@ -206,6 +204,7 @@ def nest_block_level_elements(tree, mappings, _classes=[Token], check=None):
 
             # Start moving all following nodes as a child node of this one
             moving_to_node.append(c)
+            moving_to_index.append(0)
             tags_stack.append(end)
 
             # This node will create a side-tree containing the 'parameters'.
@@ -215,6 +214,9 @@ def nest_block_level_elements(tree, mappings, _classes=[Token], check=None):
         # End of this block-level tag
         elif moving_to_node and is_given_class and check_value == tags_stack[-1][-1]:
             tree.children.remove(c)
+
+            # Some node classes like to receive a notification of the matching
+            # end node.
             if hasattr(moving_to_node[-1], 'register_end_node'):
                 moving_to_node[-1].register_end_node(c)
 
@@ -224,6 +226,7 @@ def nest_block_level_elements(tree, mappings, _classes=[Token], check=None):
 
             # Continue
             moving_to_node.pop()
+            moving_to_index.pop()
             tags_stack.pop()
 
         # Any 'else'-node within
@@ -231,11 +234,11 @@ def nest_block_level_elements(tree, mappings, _classes=[Token], check=None):
             tree.children.remove(c)
 
             # Move the tags list
-            count = end_tag[-1].index(check_value) + 1
-            tags_stack[-1] = tags_stack[-1][count:]
+            position = tags_stack[-1].index(check_value)
+            tags_stack[-1] = tags_stack[-1][position+1:]
 
             # Children attribute ++
-            list_index += count
+            moving_to_index[-1] += position+1
 
         # Are we moving nodes
         elif moving_to_node:

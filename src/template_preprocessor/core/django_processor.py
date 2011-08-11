@@ -184,6 +184,34 @@ class DjangoRawOutput(Token):
             handler(c)
 
 
+class DjangoIfTag(Token):
+    """
+    {% if condition %}...{% else %}...{% endif %}
+    """
+    def process_params(self, params):
+        self._params = params
+
+
+    def output(self, handler):
+        handler(u'{%if ');
+        handler(' '.join([ p.output_as_string() for p in self._params[1:] ]))
+        handler(u'%}')
+
+        for c in self.children:
+            handler(c)
+
+        # Render {% else %} if this node had an else-block
+        # NOTE: nest_block_level_elements will place the second part into
+        # children2
+        if hasattr(self, 'children2'):
+            handler(u'{%else%}')
+            for c in self.children2:
+                handler(c)
+
+        handler(u'{%endif%}')
+
+
+
 class DjangoExtendsTag(Token):
     """
     {% extends varname_or_template %}
@@ -578,8 +606,9 @@ __DJANGO_BLOCK_ELEMENTS = {
     '!raw': ('!endraw', DjangoRawOutput),
 
 
+    'if': ('else', 'endif', DjangoIfTag),
+
 #    'xhr': ('else', 'endxhr', DjangoXhrTag),
-#    'if': ('else', 'endif', DjangoIfTag),
 #    'is_enabled': ('else', 'end_isenabled', DjangoIsEnabledTag),
 }
 
@@ -888,7 +917,7 @@ def _preprocess_trans_tags(tree):
             translation_info = trans.translation_info
 
             # Translate strings
-            string = _(translation_info.string)
+            string = _(translation_info.string or ' ') # or ' ', because we don't want to translate the empty string which returns PO meta info.
             if translation_info.has_plural:
                 plural_string = ungettext(translation_info.string, translation_info.plural_string, 2)
 
@@ -930,7 +959,7 @@ def _preprocess_trans_tags(tree):
         # Process {% trans "..." %}
         elif isinstance(trans, DjangoTransTag):
             if not trans.is_variable:
-                output = _(trans.string)
+                output = _(trans.string or ' ')
                 translation_info = trans.translation_info
                 trans.__class__ = DjangoTranslated
                 trans.init(output, translation_info)
