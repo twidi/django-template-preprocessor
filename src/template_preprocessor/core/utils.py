@@ -37,7 +37,6 @@ def get_media_source_from_url(url):
     """
     For a given media/static URL, return the matching full path in the media/static directory
     """
-
     # Media
     if MEDIA_URL and url.startswith(MEDIA_URL):
         return os.path.join(MEDIA_ROOT, url[len(MEDIA_URL):].lstrip('/'))
@@ -74,7 +73,11 @@ def read_media(url):
         except urllib2.URLError, e:
             raise CompileException(None, 'Opening %s failed: %s' % (url, e.message))
     else:
-        return codecs.open(get_media_source_from_url(url), 'r', 'utf-8').read()
+        path = get_media_source_from_url(url)
+        if path:
+            return codecs.open(path, 'r', 'utf-8').read()
+        else:
+            raise CompileException(None, 'External media file %s does not exist' % url)
 
 
 def simplify_media_url(url):
