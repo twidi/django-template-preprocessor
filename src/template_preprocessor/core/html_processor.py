@@ -569,7 +569,7 @@ def _add_html_parser_extensions(tree):
     """
     Patch (some) nodes in the parse tree, to get the HTML parser functionality.
     """
-    for node in tree.children:
+    for node in tree.all_children:
         if isinstance(node, Token):
             if node.name in __HTML_EXTENSION_MAPPINGS:
                 node.__class__ = __HTML_EXTENSION_MAPPINGS[node.name]
@@ -625,26 +625,27 @@ def _merge_content_nodes(tree, context):
     adding line/column number annotations later on.
     """
     def apply(tree):
-        last_child = None
+        for children in tree.children_lists:
+            last_child = None
 
-        for c in tree.children[:]:
-            if isinstance(c, HtmlContent):
-                # Second content node (following another content node)
-                if last_child:
-                    for i in c.children:
-                        last_child.children.append(i)
-                    tree.children.remove(c)
-                # Every first content node
+            for c in children[:]:
+                if isinstance(c, HtmlContent):
+                    # Second content node (following another content node)
+                    if last_child:
+                        for i in c.children:
+                            last_child.children.append(i)
+                        children.remove(c)
+                    # Every first content node
+                    else:
+                        last_child = c
+                        last_child.__class__ = HtmlContent
                 else:
-                    last_child = c
-                    last_child.__class__ = HtmlContent
-            else:
-                last_child = None
+                    last_child = None
 
-        # Apply recursively
-        for c in tree.children:
-            if isinstance(c, Token):
-                _merge_content_nodes(c, context)
+            # Apply recursively
+            for c in children:
+                if isinstance(c, Token):
+                    _merge_content_nodes(c, context)
 
     # Concatenate nodes
     if context.insert_debug_symbols:
@@ -659,46 +660,47 @@ def _remove_whitespace_around_html_block_level_tags(tree):
     whitespace_elements = []
     after_block_level_element = False
 
-    for c in tree.children[:]:
-        # If we find a block level element
-        if (isinstance(c, HtmlTag) or isinstance(c, HtmlEndTag)) and c.html_tagname in __HTML_BLOCK_LEVEL_ELEMENTS:
-            after_block_level_element = True
+    for children in tree.children_lists:
+        for c in children[:]:
+            # If we find a block level element
+            if (isinstance(c, HtmlTag) or isinstance(c, HtmlEndTag)) and c.html_tagname in __HTML_BLOCK_LEVEL_ELEMENTS:
+                after_block_level_element = True
 
-            # remove all whitespace before
-            for w in whitespace_elements:
-                tree.children.remove(w)
-            whitespace_elements = []
+                # remove all whitespace before
+                for w in whitespace_elements:
+                    children.remove(w)
+                whitespace_elements = []
 
-            # Also, *inside* the block level element, remove whitespace at the
-            # beginning and before the end
-            while len(c.children) and isinstance(c.children[0], HtmlWhiteSpace):
-                c.children = c.children[1:]
-            while len(c.children) and isinstance(c.children[-1], HtmlWhiteSpace):
-                c.children = c.children[:-1]
+                # Also, *inside* the block level element, remove whitespace at the
+                # beginning and before the end
+                while len(c.children) and isinstance(c.children[0], HtmlWhiteSpace):
+                    c.children = c.children[1:]
+                while len(c.children) and isinstance(c.children[-1], HtmlWhiteSpace):
+                    c.children = c.children[:-1]
 
-        # If we find a whitespace
-        elif isinstance(c, HtmlWhiteSpace):
-            if after_block_level_element:
-                # Remove whitespace after.
-                tree.children.remove(c)
+            # If we find a whitespace
+            elif isinstance(c, HtmlWhiteSpace):
+                if after_block_level_element:
+                    # Remove whitespace after.
+                    children.remove(c)
+                else:
+                    whitespace_elements.append(c)
+
+            # Something else: reset state
             else:
-                whitespace_elements.append(c)
+                whitespace_elements = []
+                after_block_level_element = False
 
-        # Something else: reset state
-        else:
-            whitespace_elements = []
-            after_block_level_element = False
-
-        # Recursively
-        if isinstance(c, Token):
-            _remove_whitespace_around_html_block_level_tags(c)
+            # Recursively
+            if isinstance(c, Token):
+                _remove_whitespace_around_html_block_level_tags(c)
 
 
 def _compress_whitespace(tree):
     # Don't compress in the following tags
     dont_enter = [ HtmlScriptNode, HtmlStyleNode, HtmlPreNode, HtmlTextareaNode ]
 
-    for c in tree.children:
+    for c in tree.all_children:
         if isinstance(c, HtmlWhiteSpace):
             c.compress()
         elif isinstance(c, Token) and not any([ isinstance(c, t) for t in dont_enter ]):
@@ -908,7 +910,7 @@ def _check_no_block_level_html_in_inline_html(tree, options):
     in-line HTML elements, like <span>. Raise CompileException otherwise.
     """
     def check(node, inline_tag=None):
-        for c in node.children:
+        for c in node.all_children:
             if isinstance(c, HtmlNode) and hasattr(c.__class__, 'html_tagname'):
                 if inline_tag and c.__class__.html_tagname in __HTML_BLOCK_LEVEL_ELEMENTS:
                     raise CompileException(c, 'Improper nesting of HTML tags. Block level <%s> node should not appear inside inline <%s> node.' % (c.__class__.html_tagname, inline_tag))
@@ -1202,7 +1204,7 @@ def _insert_debug_symbols(tree, context):
     def insert_trans_tags(tree):
         last_trace = None
 
-        for node in tree.children:
+        for node in tree.all_children:
             if isinstance(node, BeforeDjangoTranslatedTrace):
                 original_node = node.original_node
                 node.children = ['<d:tr d:l="%s" d:c="%s" d:t="%s" d:s="%s" d:tr="%s"></d:tr>' %
@@ -1309,6 +1311,13 @@ def _process_html_tree(tree, context):
     if options.merge_internal_css:
         _merge_internal_css(tree)
 
+    # Whitespace compression
+    # To be dore before merging content nodes.
+    if options.whitespace_compression:
+        _compress_whitespace(tree)
+        _remove_whitespace_around_html_block_level_tags(tree)
+
+    # Merge whitespace and other content.
     # Need to be done before JS or CSS compiling.
     _merge_content_nodes(tree, context)
 
@@ -1348,9 +1357,3 @@ def _process_html_tree(tree, context):
     # Insert DEBUG symbols (for bringing line/column numbers to web client)
     if context.insert_debug_symbols:
         _insert_debug_symbols(tree, context)
-
-    # Whitespace compression
-    if options.whitespace_compression:
-        _compress_whitespace(tree)
-        _remove_whitespace_around_html_block_level_tags(tree)
-

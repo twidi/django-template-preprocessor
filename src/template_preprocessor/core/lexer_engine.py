@@ -194,6 +194,7 @@ def nest_block_level_elements(tree, mappings, _classes=[Token], check=None):
             m = mappings[check(c)]
             (end, class_) = (m[:-1], m[-1])
 
+
             # Patch class
             c.__class__ = class_
 

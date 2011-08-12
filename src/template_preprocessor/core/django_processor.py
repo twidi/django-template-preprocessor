@@ -184,34 +184,6 @@ class DjangoRawOutput(Token):
             handler(c)
 
 
-class DjangoIfTag(Token):
-    """
-    {% if condition %}...{% else %}...{% endif %}
-    """
-    def process_params(self, params):
-        self._params = params
-
-
-    def output(self, handler):
-        handler(u'{%if ');
-        handler(' '.join([ p.output_as_string() for p in self._params[1:] ]))
-        handler(u'%}')
-
-        for c in self.children:
-            handler(c)
-
-        # Render {% else %} if this node had an else-block
-        # NOTE: nest_block_level_elements will place the second part into
-        # children2
-        if hasattr(self, 'children2'):
-            handler(u'{%else%}')
-            for c in self.children2:
-                handler(c)
-
-        handler(u'{%endif%}')
-
-
-
 class DjangoExtendsTag(Token):
     """
     {% extends varname_or_template %}
@@ -478,18 +450,6 @@ class DjangoMacroTag(DjangoContainer):
         handler(u'{%endmacro%}')
 
 
-class DjangoIfDebugTag(DjangoContainer):
-    """
-    {% ifdebug %} ... {% endifdebug %}
-    """
-    def process_params(self, params):
-        pass
-
-    def output(self, handler):
-        handler(u'{%ifdebug%}')
-        Token.output(self, handler)
-        handler(u'{%endifdebug%}')
-
 
 class DjangoCallMacroTag(Token):
     def process_params(self, params):
@@ -515,6 +475,33 @@ class DjangoCompressTag(DjangoContainer):
         # Don't output the template tags.
         # (these are hints to the preprocessor only.)
         Token.output(self, handler)
+
+
+class DjangoIfTag(DjangoContainer):
+    """
+    {% if condition %}...{% else %}...{% endif %}
+    """
+    def process_params(self, params):
+        self._params = params
+
+
+    def output(self, handler):
+        handler(u'{%if ');
+        handler(' '.join([ p.output_as_string() for p in self._params[1:] ]))
+        handler(u'%}')
+
+        for c in self.children:
+            handler(c)
+
+        # Render {% else %} if this node had an else-block
+        # NOTE: nest_block_level_elements will place the second part into
+        # children2
+        if hasattr(self, 'children2'):
+            handler(u'{%else%}')
+            for c in self.children2:
+                handler(c)
+
+        handler(u'{%endif%}')
 
 
 class DjangoBlockTag(DjangoContainer):
@@ -559,7 +546,7 @@ def _add_parser_extensions(tree):
                 if hasattr(node, 'init_extension'):
                     node.init_extension()
 
-            for c in node.children:
+            for c in node.all_children:
                 _add_parser_extensions2(c)
 
     _add_parser_extensions2(tree)
@@ -581,7 +568,7 @@ def _process_inline_tags(tree):
     """
     Replace DjangoTag elements by more specific elements.
     """
-    for c in tree.children:
+    for c in tree.all_children:
         if isinstance(c, DjangoTag) and c.tagname in _DJANGO_INLINE_ELEMENTS:
             # Patch class
             c.__class__ = _DJANGO_INLINE_ELEMENTS[c.tagname]
@@ -600,18 +587,12 @@ __DJANGO_BLOCK_ELEMENTS = {
     'block': ('endblock', DjangoBlockTag),
     'blocktrans': ('endblocktrans', DjangoBlocktransTag),
     'macro': ('endmacro', DjangoMacroTag),
-    'ifdebug': ('endifdebug', DjangoIfDebugTag),
     'decorate': ('enddecorate', DjangoDecorateTag),
     'compress': ('endcompress', DjangoCompressTag),
     '!raw': ('!endraw', DjangoRawOutput),
 
-
     'if': ('else', 'endif', DjangoIfTag),
-
-#    'xhr': ('else', 'endxhr', DjangoXhrTag),
-#    'is_enabled': ('else', 'end_isenabled', DjangoIsEnabledTag),
 }
-
 
 
 
@@ -653,7 +634,7 @@ class DjangoTranslated(DjangoContent):
 # ====================================[ Parse tree manipulations ]=====================================
 
 def apply_method_on_parse_tree(tree, class_, method, *args, **kwargs):
-    for c in tree.children:
+    for c in tree.all_children:
         if isinstance(c, class_):
             getattr(c, method)(*args, **kwargs)
 
@@ -681,7 +662,7 @@ def _process_extends(tree, context):
     try:
         base_tree = None
 
-        for c in tree.children:
+        for c in tree.all_children:
             if isinstance(c, DjangoExtendsTag) and not c.template_name_is_variable:
                 extends_tag = c
                 base_tree = context.load(c.template_name)
@@ -965,14 +946,6 @@ def _preprocess_trans_tags(tree):
                 trans.init(output, translation_info)
 
 
-def _preprocess_ifdebug(tree):
-    if settings.DEBUG:
-        for ifdebug in tree.child_nodes_of_class([ DjangoIfDebugTag ]):
-            tree.replace_child_by_nodes(ifdebug, ifdebug.children)
-    else:
-        tree.remove_child_nodes_of_class(DjangoIfDebugTag)
-
-
 def _preprocess_macros(tree):
     """
     Replace every {% callmacro "name" %} by the content of {% macro "name" %} ... {% endmacro %}
@@ -995,7 +968,7 @@ def _preprocess_macros(tree):
 def _execute_preprocessable_tags(tree):
     preprocessable_tags = get_preprocessable_tags()
 
-    for c in tree.children:
+    for c in tree.all_children:
         if isinstance(c, DjangoTag) and c.tagname in preprocessable_tags:
             params = [ p.output_as_string() for p in c.get_childnodes_with_name('django-tag-element') ]
             try:
@@ -1109,9 +1082,6 @@ def parse(source_code, path, context, main_template=False):
         # Preprocess {% callmacro %} tags
         if options.preprocess_macros:
             _preprocess_macros(tree)
-
-        if options.preprocess_ifdebug:
-            _preprocess_ifdebug(tree)
 
         # Group all {% load %} statements
         if options.merge_all_load_tags:

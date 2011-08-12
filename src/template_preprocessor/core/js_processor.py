@@ -304,7 +304,7 @@ def _add_javascript_parser_extensions(js_node):
     """
     js_node.symbol_table = { }
 
-    for c in js_node.children:
+    for c in js_node.all_children:
         if isinstance(c, Token):
             # Patch the js scope class
             if c.name in __JS_EXTENSION_MAPPINGS:
@@ -322,7 +322,7 @@ def _compress_javascript_whitespace(js_node, root_node=True):
     """
     Remove all whitepace in javascript code where possible.
     """
-    for c in js_node.children:
+    for c in js_node.all_children:
         if isinstance(c, Token):
             # Whitespcae tokens are required to be kept. e.g. between 'var' and the actual varname.
             if isinstance(c, JavascriptWhiteSpace):
@@ -359,40 +359,41 @@ def _minify_variable_names(js_node):
     # (do this recursively for every javascript scope.)
     def find_variables(js_node, scope, in_root_node=True):
         next_is_variable = False
-        for index, c in enumerate(js_node.children):
-            # Look for 'function' and 'var'
-            if isinstance(c, JavascriptKeyword) and c.keyword in ('function', 'var') and not in_root_node:
-                next_is_variable = True
+        for children in js_node.children_lists:
+            for index, c in enumerate(children):
+                # Look for 'function' and 'var'
+                if isinstance(c, JavascriptKeyword) and c.keyword in ('function', 'var') and not in_root_node:
+                    next_is_variable = True
 
-                # NOTE: the `in_root_node` check is required because "var
-                # varname" should not be renamed, if it's been declared in the
-                # global scope. We only want to rename variables in private
-                # nested scopes.
+                    # NOTE: the `in_root_node` check is required because "var
+                    # varname" should not be renamed, if it's been declared in the
+                    # global scope. We only want to rename variables in private
+                    # nested scopes.
 
-                if c.keyword == 'function':
-                    find_variables_in_function_parameter_list(js_node.children[index:])
+                    if c.keyword == 'function':
+                        find_variables_in_function_parameter_list(children[index:])
 
-            elif isinstance(c, JavascriptVariable) and next_is_variable:
-                scope.symbol_table[c.varname] = c
-                next_is_variable = False
+                elif isinstance(c, JavascriptVariable) and next_is_variable:
+                    scope.symbol_table[c.varname] = c
+                    next_is_variable = False
 
-            elif isinstance(c, JavascriptScope):
-                find_variables(c, c, False)
-                next_is_variable = False
+                elif isinstance(c, JavascriptScope):
+                    find_variables(c, c, False)
+                    next_is_variable = False
 
-            elif isinstance(c, JavascriptWhiteSpace):
-                pass
+                elif isinstance(c, JavascriptWhiteSpace):
+                    pass
 
-            elif isinstance(c, JavascriptParentheses) or isinstance(c, JavascriptSquareBrackets):
-                find_variables(c, scope)
-                next_is_variable = False
+                elif isinstance(c, JavascriptParentheses) or isinstance(c, JavascriptSquareBrackets):
+                    find_variables(c, scope)
+                    next_is_variable = False
 
-            elif isinstance(c, Token):
-                find_variables(c, scope)
-                next_is_variable = False
+                elif isinstance(c, Token):
+                    find_variables(c, scope)
+                    next_is_variable = False
 
-            else:
-                next_is_variable = False
+                else:
+                    next_is_variable = False
 
 
     # Detect variable declarations in function parameters
@@ -454,47 +455,48 @@ def _minify_variable_names(js_node):
     def find_free_variables(js_node, parent_scopes):
         skip_next_var = False
 
-        for index, c in enumerate(js_node.children):
-            # Variables after a dot operator shouldn't be renamed.
-            if isinstance(c, JavascriptOperator):
-                skip_next_var = (c.operator == '.')
+        for children in js_node.children_lists:
+            for index, c in enumerate(children):
+                # Variables after a dot operator shouldn't be renamed.
+                if isinstance(c, JavascriptOperator):
+                    skip_next_var = (c.operator == '.')
 
-            elif isinstance(c, JavascriptVariable):
-                # Test whether this is not the key of a dictionary,
-                # if so, we shouldn't rename it.
-                try:
-                    if index + 1 < len(js_node.children):
-                        n = js_node.children[index+1]
-                        if isinstance(n, JavascriptOperator) and n.is_colon:
-                            skip_next_var = True
+                elif isinstance(c, JavascriptVariable):
+                    # Test whether this is not the key of a dictionary,
+                    # if so, we shouldn't rename it.
+                    try:
+                        if index + 1 < len(children):
+                            n = children[index+1]
+                            if isinstance(n, JavascriptOperator) and n.is_colon:
+                                skip_next_var = True
 
-                    # Except for varname in this case:    (1 == 2 ? varname : 3 )
-                    if index > 0:
-                        n = js_node.children[index-1]
-                        if isinstance(n, JavascriptOperator) and n.operator == '?':
-                            skip_next_var = False
-                except IndexError, e:
-                    pass
+                        # Except for varname in this case:    (1 == 2 ? varname : 3 )
+                        if index > 0:
+                            n = children[index-1]
+                            if isinstance(n, JavascriptOperator) and n.operator == '?':
+                                skip_next_var = False
+                    except IndexError, e:
+                        pass
 
-                # If we have to link this var (not after a dot, not before a colon)
-                if not skip_next_var:
-                    # Link variable to definition symbol table
-                    varname = c.varname
-                    linked = False
-                    for s in parent_scopes:
-                        if varname in s.symbol_table:
-                            c.link_to_variable(s.symbol_table[varname])
-                            linked = True
-                            break
+                    # If we have to link this var (not after a dot, not before a colon)
+                    if not skip_next_var:
+                        # Link variable to definition symbol table
+                        varname = c.varname
+                        linked = False
+                        for s in parent_scopes:
+                            if varname in s.symbol_table:
+                                c.link_to_variable(s.symbol_table[varname])
+                                linked = True
+                                break
 
-                    if not linked:
-                        global_variable_names.append(varname)
+                        if not linked:
+                            global_variable_names.append(varname)
 
-            elif isinstance(c, JavascriptScope):
-                find_free_variables(c, [c] + parent_scopes)
+                elif isinstance(c, JavascriptScope):
+                    find_free_variables(c, [c] + parent_scopes)
 
-            elif isinstance(c, Token):
-                find_free_variables(c, parent_scopes)
+                elif isinstance(c, Token):
+                    find_free_variables(c, parent_scopes)
 
     find_free_variables(js_node, [ js_node ])
 
@@ -530,9 +532,8 @@ def _minify_variable_names(js_node):
                 avoid_names = avoid_names + [ new_name ]
                 js_node.symbol_table[s].varname = new_name
 
-        for c in js_node.children:
-            if isinstance(c, Token):
-                rename_variables(c, avoid_names[:])
+        for c in js_node.child_nodes_of_class([ Token ]):
+            rename_variables(c, avoid_names[:])
 
     rename_variables(js_node, global_variable_names[:])
 

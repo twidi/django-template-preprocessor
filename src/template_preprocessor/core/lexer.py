@@ -18,6 +18,7 @@ __author__ = 'Jonathan Slenders, City Live'
 __all__ = ('lex', 'Token')
 
 import re
+import itertools
 
 
 class CompileException(Exception):
@@ -57,16 +58,34 @@ class Token(object):
         self.line = line
         self.path = path
         self.column = column
-        self.children = []
+        self.children = [] # nest_block_level_elements can also create a .children2, .children3 ...
         self.params = [] # 2nd child list, used by the parser
 
     def append(self, child):
         self.children.append(child)
 
+    @property
+    def children_lists(self):
+        """
+        Yield all the children child lists.
+        e.g. "{% if %} ... {% else %} ... {% endif %}" has two child lists.
+        """
+        yield self.children
+
+        i = 2
+        while hasattr(self, 'children%i' % i):
+            yield getattr(self, 'children%i' % i)
+            i += 1
+
+    @property
+    def all_children(self):
+        return list(itertools.chain(* list(self.children_lists)))
+
     def get_childnodes_with_name(self, name):
-        for c in self.children:
-            if c.name == name:
-                yield c
+        for children in self.children_lists:
+            for c in children:
+                if c.name == name:
+                    yield c
 
     def is_i(self, class_):
         """
@@ -75,24 +94,6 @@ class Token(object):
         isinstance(node, TokenClass)
         """
         return isinstance(self, class_)
-
-    def clone(self):
-        """
-        Clone everything within the parse tree.
-        None of the nodes in the new tree will have references to the old
-        tree
-        """
-        # Create new tree
-        tree = Token(self.name, self.line, self.column)
-
-        # Copy children
-        for c in self.children:
-            if isinstance(c, basestring):
-                tree.append(c)
-            else:
-                tree.append(c.clone())
-
-        return tree
 
     def _print(self, prefix=''):
         """
@@ -123,15 +124,17 @@ class Token(object):
         This calls the output handler for every child of this node.
         To be overriden in the parse tree. (an override can output additional information.)
         """
-        for c in self.children:
-            handler(c)
+        for children in self.children_lists:
+            for c in children:
+                handler(c)
 
     def _output(self, handler):
         """
         Original output method.
         """
-        for c in self.children:
-            handler(c)
+        for children in self.children_lists:
+            for c in children:
+                handler(c)
 
     def output_as_string(self, use_original_output_method=False, hook_dict=None):
         """
@@ -181,14 +184,15 @@ class Token(object):
         (I think it's a depth-first implementation.)
         `dont_enter` parameter can receive a list of
         """
-        for c in self.children:
-            if any([ isinstance(c, t) for t in classes ]):
-                yield c
+        for children in self.children_lists:
+            for c in children:
+                if any([ isinstance(c, t) for t in classes ]):
+                    yield c
 
-            if isinstance(c, Token):
-                if not any([isinstance(c, t) for t in dont_enter or [] ]):
-                    for i in c.child_nodes_of_class(classes, dont_enter):
-                        yield i
+                if isinstance(c, Token):
+                    if not any([isinstance(c, t) for t in dont_enter or [] ]):
+                        for i in c.child_nodes_of_class(classes, dont_enter):
+                            yield i
 
     def remove_child_nodes_of_class(self, class_, except_nodes=None):
         """
@@ -197,55 +201,40 @@ class Token(object):
         """
         except_nodes = except_nodes or []
 
-        for c in self.children[:]:
-            if isinstance(c, class_) and not c in except_nodes:
-                self.children.remove(c)
+        for children in self.children_lists:
+            for c in children[:]:
+                if isinstance(c, class_) and not c in except_nodes:
+                    children.remove(c)
 
-            if isinstance(c, Token):
-                c.remove_child_nodes_of_class(class_)
+                if isinstance(c, Token):
+                    c.remove_child_nodes_of_class(class_)
 
     def remove_child_nodes(self, nodes):
         """
         Removed these nodes from the tree.
         """
-        for c in self.children[:]:
-            if c in nodes:
-                self.children.remove(c)
+        for children in self.children_lists:
+            for c in children[:]:
+                if c in nodes:
+                    children.remove(c)
 
-            if isinstance(c, Token):
-                c.remove_child_nodes(nodes)
-
-    def replace_child_by_nodes(self, child, nodes):
-        """
-        Replace one of the child nodes of the current node, by
-        this nodes.
-        This should only replace *one* node, be sure,
-        `child` appears only once in the tree.
-        """
-        new_nodes = []
-        for c in self.children:
-            if isinstance(c, Token):
-                c.replace_child_by_nodes(child, nodes)
-
-            if child == c:
-                new_nodes += nodes
-            else:
-                new_nodes.append(c)
-        self.children = new_nodes
+                if isinstance(c, Token):
+                    c.remove_child_nodes(nodes)
 
     def collapse_nodes_of_class(self, class_):
         """
         Replace nodes of this class by their children.
         """
         new_nodes = []
-        for c in self.children:
-            if isinstance(c, Token):
-                c.collapse_nodes_of_class(class_)
+        for children in self.children_lists:
+            for c in children:
+                if isinstance(c, Token):
+                    c.collapse_nodes_of_class(class_)
 
-            if isinstance(c, class_):
-                new_nodes += c.children
-            else:
-                new_nodes.append(c)
+                if isinstance(c, class_):
+                    new_nodes += c.children
+                else:
+                    new_nodes.append(c)
 
         self.children = new_nodes
 

@@ -143,7 +143,7 @@ def _add_css_parser_extensions(css_node):
     """
     Patch nodes in the parse tree, to get the CSS parser functionality.
     """
-    for node in css_node.children:
+    for node in css_node.all_children:
         if isinstance(node, Token):
             # Patch the js scope class
             if node.name in __CSS_EXTENSION_MAPPINGS:
@@ -182,7 +182,7 @@ def _compress_css_whitespace(css_node):
     """
     Remove all whitepace in the css code where possible.
     """
-    for c in css_node.children:
+    for c in css_node.all_children:
         if isinstance(c, CssOperator):
             # Around operators, we can delete all whitespace.
             c.children = [ c.output_as_string().strip()  ]
