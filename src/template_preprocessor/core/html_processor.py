@@ -62,7 +62,7 @@ __HTML_ATTRIBUTES = {
     'html': ('xmlns', 'lang', 'dir', ),
     'body': ('onLoad', ),
     'img': ('src', 'alt', 'height', 'width', ),
-    'input': ('type', 'name', 'value', 'maxlength', 'checked', 'disabled', 'src', 'size', 'readonly' ),
+    'input': ('type', 'name', 'value', 'maxlength', 'checked', 'disabled', 'src', 'size', 'readonly', 'autocomplete', ),
     'select': ('name', 'value', 'size', ),
     'textarea': ('name', 'rows', 'cols', 'readonly', ),
     'link': ('type', 'rel', 'href', 'media', 'charset', ),
