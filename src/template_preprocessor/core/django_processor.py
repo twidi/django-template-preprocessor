@@ -29,6 +29,7 @@ __DJANGO_STATES = {
             # Start of django tag
             State.Transition(r'\{#', (StartToken('django-comment'), Shift(), Push('django-comment'))),
             State.Transition(r'\{%\s*comment\s*%\}', (StartToken('django-multiline-comment'), Shift(), Push('django-multiline-comment'))),
+            State.Transition(r'\{%\s*verbatim\s*%\}', (StartToken('django-verbatim'), Shift(), Push('django-verbatim'))),
             State.Transition(r'\{%\s*', (StartToken('django-tag'), Shift(), Push('django-tag'))),
             State.Transition(r'\{{\s*', (StartToken('django-variable'), Shift(), Push('django-variable'))),
 
@@ -51,7 +52,7 @@ __DJANGO_STATES = {
                     # Nested single line comments are allowed
             State.Transition(r'\{#', (StartToken('django-comment'), Shift(), Push('django-comment'))),
             State.Transition(r'[^{]+', (Record(), Shift(), )), # Everything except '{'
-            State.Transition(r'\{(?!\{%\s*endcomment\s*%\}|#)', (Record(), Shift(), )), # '{' if not followed by '%endcomment%}'
+            State.Transition(r'\{(?!%\s*endcomment\s*%\}|#)', (Record(), Shift(), )), # '{' if not followed by '%endcomment%}'
         ),
     # {% tagname ... %}
     'django-tag': State(
@@ -72,6 +73,13 @@ __DJANGO_STATES = {
             State.Transition(r'\s+', (Shift(), )),
 
             State.Transition(r'.|\s', (Error('Error in parser: django-variable'),)),
+        ),
+
+    # {% verbatim %} ... {% endverbatim %}
+    'django-verbatim': State(
+            State.Transition(r'\{%\s*endverbatim\s*%\}', (Shift(), StopToken(), Pop())), # {% endverbatim %}
+            State.Transition(r'[^{]+', (Record(), Shift(), )), # Everything except '{'
+            State.Transition(r'\{(?!%\s*endverbatim\s*%\})', (Record(), Shift(), )), # '{' if not followed by '%endverbatim%}'
         ),
     }
 
@@ -99,6 +107,7 @@ class DjangoRootNode(DjangoContainer):
     """
     pass
 
+
 class DjangoComment(Token):
     """
     {# ... #}
@@ -107,6 +116,7 @@ class DjangoComment(Token):
         # Don't output anything. :)
         pass
 
+
 class DjangoMultilineComment(Token):
     """
     {% comment %} ... {% endcomment %}
@@ -114,6 +124,29 @@ class DjangoMultilineComment(Token):
     def output(self, handler):
         # Don't output anything.
         pass
+
+
+class DjangoVerbatim(Token):
+    """
+    {% verbatim %} ... {% endverbatim %}
+    """
+    # This tag is transparent, things that look like template tags, variables
+    # and other stuff inside this tag is not interpreted in any way, but send to the
+    # output straight away.
+    #
+    # A {% load verbatim %} may be required in order to get the Django
+    # template engine support it. See this template tag:
+    # https://gist.github.com/629508
+    #
+    # Verbatim is still an open discussion:
+    # http://groups.google.com/group/django-developers/browse_thread/thread/eda0e9187adcbe36/abfb48648c80a9c7?lnk=gst&q=verbatim#abfb48648c80a9c7
+
+    def output(self, handler):
+        handler('{% verbatim %}')
+        for c in self.children:
+            handler(c)
+        handler('{% endverbatim %}')
+
 
 class DjangoTag(Token):
     @property
@@ -529,6 +562,7 @@ _PARSER_MAPPING_DICT = {
     'django-variable': DjangoVariable,
     'django-comment': DjangoComment,
     'django-multiline-comment': DjangoMultilineComment,
+    'django-verbatim': DjangoVerbatim,
 }
 
 def _add_parser_extensions(tree):
