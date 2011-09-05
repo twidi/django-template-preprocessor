@@ -179,7 +179,7 @@ class Command(BaseCommand):
         for lang in languages:
             # Now compile all templates to the cache directory
             for dir, t in template_iterator():
-                input_path = os.path.join(dir, t)
+                input_path = os.path.normpath(os.path.join(dir, t))
                 output_path = self._make_output_path(lang, t)
 
                 # Compile this template if:
@@ -208,6 +208,7 @@ class Command(BaseCommand):
                                 except TemplateDoesNotExist, e:
                                     pass # Reference to non-existing template
 
+        # Return ordered queue
         queue = list(queue)
         queue.sort()
         return queue
@@ -246,7 +247,7 @@ class Command(BaseCommand):
 
 
     def _make_output_path(self, language, template):
-        return os.path.join(settings.TEMPLATE_CACHE_DIR, language, template)
+        return os.path.normpath(os.path.join(settings.TEMPLATE_CACHE_DIR, language, template))
 
 
     def _save_template_dependencies(self, lang, template, dependency_list):
