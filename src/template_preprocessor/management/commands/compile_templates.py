@@ -294,6 +294,8 @@ class Command(BaseCommand):
                 code = codecs.open(input_path, 'r', 'utf-8').read()
             except UnicodeDecodeError, e:
                 raise CompileException(0, 0, input_path, str(e))
+            except IOError, e:
+                raise CompileException(0, 0, input_path, str(e))
 
             # Compile
             if no_html:
