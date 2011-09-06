@@ -225,8 +225,8 @@ class Token(object):
         """
         Replace nodes of this class by their children.
         """
-        new_nodes = []
         for children in self.children_lists:
+            new_nodes = []
             for c in children:
                 if isinstance(c, Token):
                     c.collapse_nodes_of_class(class_)
@@ -236,7 +236,7 @@ class Token(object):
                 else:
                     new_nodes.append(c)
 
-        self.children = new_nodes
+            children.__init__(new_nodes)
 
 
 class State(object):
