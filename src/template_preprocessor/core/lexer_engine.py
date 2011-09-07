@@ -133,6 +133,9 @@ def tokenize(tree, states, classes_to_replace_by_parsed_content, classes_to_ente
 
                                 elif isinstance(action, StopToken):
 # TODO: check following constraint!
+# token_stack[-1] is a childnode list now instead of a node. it does no longer
+# have an attribute name!
+
 #                                    if action.state_name and token_stack[-1].name != action.state_name:
 #                                        raise CompileException(line, column, path, 'Token mismatch')
 
@@ -179,12 +182,6 @@ def nest_block_level_elements(tree, mappings, _classes=[Token], check=None):
     """
     check = check or (lambda c: c.name)
 
-    # Push/Pop stacks
-    moving_to_node = []
-    moving_to_index = []
-    tags_stack = [] # Stack of lists (top of the list contains a list of
-                # check_values for possible {% else... %} or {% end... %}-nodes.
-
     def get_moving_to_list():
         """
         Normally, we are moving childnodes to the .children
@@ -202,6 +199,12 @@ def nest_block_level_elements(tree, mappings, _classes=[Token], check=None):
         return getattr(node, 'children%s' % index)
 
     for nodelist in tree.children_lists:
+        # Push/Pop stacks
+        moving_to_node = []
+        moving_to_index = []
+        tags_stack = [] # Stack of lists (top of the list contains a list of
+                    # check_values for possible {% else... %} or {% end... %}-nodes.
+
         for c in nodelist[:]:
             # The 'tags' are only concidered tags if they are of one of these classes
             is_given_class = any([isinstance(c, cls) for cls in _classes])

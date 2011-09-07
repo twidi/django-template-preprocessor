@@ -556,6 +556,12 @@ def fix_whitespace_bug(js_node):
 
 
 def _validate_javascript(js_node):
+    """
+    Check for missing semicolons in javascript code.
+
+    Note that this is some very fuzzy code. It works, but won't find all the errors,
+    It should be replaced sometime by a real javascript parser.
+    """
     # Check whether no comma appears at the end of any scope.
     # e.g.    var x = { y: z, } // causes problems in IE6 and IE7
     for scope in js_node.child_nodes_of_class([JavascriptScope]):
@@ -675,9 +681,16 @@ def _validate_javascript(js_node):
             elif isinstance(c, JavascriptScope):
                 semi_colon_required = False
 
+            elif isinstance(c, JavascriptKeyword) and c.keyword == 'return':
+                # Semicolon required before return in:  x=y; return y
+                if (semi_colon_required):
+                    found_missing()
+
+                # No semicolon required after return in: return y
+                semi_colon_required = False
+
             elif isinstance(c, JavascriptVariable):
                 if (semi_colon_required):
-                    print 'before variable'
                     found_missing()
 
                 semi_colon_required = True

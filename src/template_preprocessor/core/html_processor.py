@@ -657,10 +657,10 @@ def _merge_content_nodes(tree, context):
 
 
 def _remove_whitespace_around_html_block_level_tags(tree):
-    whitespace_elements = []
-    after_block_level_element = False
-
     for children in tree.children_lists:
+        whitespace_elements = []
+        after_block_level_element = False
+
         for c in children[:]:
             # If we find a block level element
             if (isinstance(c, HtmlTag) or isinstance(c, HtmlEndTag)) and c.html_tagname in __HTML_BLOCK_LEVEL_ELEMENTS:

@@ -517,7 +517,6 @@ class DjangoIfTag(DjangoContainer):
     def process_params(self, params):
         self._params = params
 
-
     def output(self, handler):
         handler(u'{%if ');
         handler(' '.join([ p.output_as_string() for p in self._params[1:] ]))
@@ -535,6 +534,32 @@ class DjangoIfTag(DjangoContainer):
                 handler(c)
 
         handler(u'{%endif%}')
+
+
+class DjangoIfEqualTag(DjangoContainer):
+    """
+    {% ifequal a b %}...{% else %}...{% endifequal %}
+    """
+    def process_params(self, params):
+        self._params = params
+        if not len(self._params) == 3:
+            raise CompileException(self, '{% ifequal %} needs exactly two parameters')
+
+    def output(self, handler):
+        handler(u'{%ifequal ');
+        handler(' '.join([ p.output_as_string() for p in self._params[1:] ]))
+        handler(u'%}')
+
+        for c in self.children:
+            handler(c)
+
+        # Render {% else %} if this node had an else-block
+        if hasattr(self, 'children2'):
+            handler(u'{%else%}')
+            for c in self.children2:
+                handler(c)
+
+        handler(u'{%endifequal%}')
 
 
 class DjangoBlockTag(DjangoContainer):
@@ -626,6 +651,7 @@ __DJANGO_BLOCK_ELEMENTS = {
     '!raw': ('!endraw', DjangoRawOutput),
 
     'if': ('else', 'endif', DjangoIfTag),
+    'ifequal': ('else', 'endifequal', DjangoIfEqualTag),
 }
 
 
@@ -789,27 +815,25 @@ def _preprocess_decorate_tags(tree, context):
         def init(self, children):
             self.children = children
 
-    decorate_blocks = list(tree.child_nodes_of_class([ DjangoDecorateTag ]))
-
-    for block in decorate_blocks:
+    for decorate_block in list(tree.child_nodes_of_class([ DjangoDecorateTag ])):
         # Content nodes
-        content = block.children
+        content = decorate_block.children
 
         # Replace content
         try:
-            include_tree = context.load(block.template_name)
+            include_tree = context.load(decorate_block.template_name)
 
             for content_var in include_tree.child_nodes_of_class([ DjangoVariable ]):
-                if content_var.varname == 'decorater.content':
+                if content_var.varname == 'decorator.content':
                     content_var.__class__ = DjangoPreprocessedVariable
                     content_var.init(content)
 
             # Move tree
-            block.__class__ = DjangoPreprocessedDecorate
-            block.init([ include_tree ])
+            decorate_block.__class__ = DjangoPreprocessedDecorate
+            decorate_block.init([ include_tree ])
 
         except TemplateDoesNotExist, e:
-            raise CompileException(block, 'Template in {% decorate %} tag not found (%s)' % block.template_name)
+            raise CompileException(decorate_block, 'Template in {% decorate %} tag not found (%s)' % decorate_block.template_name)
 
 
 def _group_all_loads(tree):
@@ -1077,6 +1101,7 @@ def parse(source_code, path, context, main_template=False):
     # It does not make sense to apply it on every include, and then again
     # on the complete tree.
     if main_template:
+
         _update_preprocess_settings(tree, context)
         options = context.options
 
@@ -1128,5 +1153,4 @@ def parse(source_code, path, context, main_template=False):
         # HTML compiler
         if options.is_html:
             compile_html(tree, context)
-
     return tree
