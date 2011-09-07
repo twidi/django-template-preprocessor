@@ -795,10 +795,10 @@ def _compile(js_node, context):
     _validate_javascript(js_node)
 
     # Remove meaningless whitespace in javascript code.
-#    _compress_javascript_whitespace(js_node)
+    _compress_javascript_whitespace(js_node)
 
     # Preprocess gettext
-#    _process_gettext(js_node, context)
+    _process_gettext(js_node, context)
 
     # Minify variable names
     _minify_variable_names(js_node)
