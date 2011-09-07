@@ -302,8 +302,6 @@ def _add_javascript_parser_extensions(js_node):
     """
     Patch (some) nodes in the parse tree, to get the JS parser functionality.
     """
-    js_node.symbol_table = { }
-
     for c in js_node.all_children:
         if isinstance(c, Token):
             # Patch the js scope class
@@ -385,11 +383,11 @@ def _minify_variable_names(js_node):
                     pass
 
                 elif isinstance(c, JavascriptParentheses) or isinstance(c, JavascriptSquareBrackets):
-                    find_variables(c, scope)
+                    find_variables(c, scope, in_root_node)
                     next_is_variable = False
 
                 elif isinstance(c, Token):
-                    find_variables(c, scope)
+                    find_variables(c, scope, in_root_node)
                     next_is_variable = False
 
                 else:
@@ -498,7 +496,7 @@ def _minify_variable_names(js_node):
                 elif isinstance(c, Token):
                     find_free_variables(c, parent_scopes)
 
-    find_free_variables(js_node, [ js_node ])
+    find_free_variables(js_node, [ ])
 
     # Following is a helper method for generating variable names
     def generate_varname(avoid_names):
@@ -532,8 +530,9 @@ def _minify_variable_names(js_node):
                 avoid_names = avoid_names + [ new_name ]
                 js_node.symbol_table[s].varname = new_name
 
-        for c in js_node.child_nodes_of_class([ Token ]):
-            rename_variables(c, avoid_names[:])
+        for c in js_node.all_children:
+            if isinstance(c, Token):
+                rename_variables(c, avoid_names[:])
 
     rename_variables(js_node, global_variable_names[:])
 
@@ -667,7 +666,6 @@ def _validate_javascript(js_node):
                         #  if (...) var ...
                         pass
                     else:
-                        print 'before var keyword'
                         found_missing()
 
             elif isinstance(c, JavascriptOperator):
@@ -797,10 +795,10 @@ def _compile(js_node, context):
     _validate_javascript(js_node)
 
     # Remove meaningless whitespace in javascript code.
-    _compress_javascript_whitespace(js_node)
+#    _compress_javascript_whitespace(js_node)
 
     # Preprocess gettext
-    _process_gettext(js_node, context)
+#    _process_gettext(js_node, context)
 
     # Minify variable names
     _minify_variable_names(js_node)
