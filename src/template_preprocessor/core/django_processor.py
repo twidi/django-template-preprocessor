@@ -1127,12 +1127,18 @@ def parse(source_code, path, context, main_template=False):
                         })
             if sites_enabled:
                 from django.contrib.sites.models import Site
-                _preprocess_variables(tree,
-                        {
-                            'SITE_DOMAIN': Site.objects.get_current().domain,
-                            'SITE_NAME': Site.objects.get_current().name,
-                            'SITE_URL': 'http://%s' % Site.objects.get_current().domain,
-                        })
+                try:
+                    # Don't preprocess anything when we don't have a Site
+                    # instance yet.
+                    site = Site.objects.get_current()
+                    _preprocess_variables(tree,
+                            {
+                                'SITE_DOMAIN': site.domain,
+                                'SITE_NAME': site.name,
+                                'SITE_URL': 'http://%s' % site.domain,
+                            })
+                except Site.DoesNotExist, e:
+                    pass
 
         # Don't output {% block %} tags in the compiled file.
         if options.remove_block_tags:
