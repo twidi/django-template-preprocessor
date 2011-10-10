@@ -246,23 +246,38 @@ class DjangoExtendsTag(Token):
 class DjangoIncludeTag(Token):
     """
     {% include varname_or_template %}
+
+    Support for with-parameters:
+    {% include "name_snippet.html" with person="Jane" greeting="Hello" %}
     """
     def process_params(self, params):
-        param = params[1].output_as_string()
+        include_param = params[1].output_as_string()
 
-        if param[0] in ('"', "'") and param[-1] in ('"', "'"):
-            self.template_name = param[1:-1]
+        # Include path
+        if include_param[0] in ('"', "'") and include_param[-1] in ('"', "'"):
+            self.template_name = include_param[1:-1]
             self.template_name_is_variable = False
         else:
-            self.template_name = param
+            self.template_name = include_param
             self.template_name_is_variable = True
 
+        # With parameters
+        if len(params) > 2 and params[2].output_as_string() == 'with':
+            self.with_params = params[3:]
+        else:
+            self.with_params = []
+
     def output(self, handler):
+        if self.with_params:
+            handler('{%with '); map(handler, self.with_params); handler('%}')
+
         if self.template_name_is_variable:
             handler(u'{%include '); handler(self.template_name); handler(u'%}')
         else:
             handler(u'{%include "'); handler(self.template_name); handler(u'"%}')
 
+        if self.with_params:
+            handler('{%endwith%}')
 
 class DjangoDecorateTag(DjangoContainer):
     """
@@ -673,8 +688,19 @@ def _update_preprocess_settings(tree, context):
 
 
 class DjangoPreprocessedInclude(DjangoContainer):
-    def init(self, children):
+    def init(self, children, with_params=None):
         self.children = children
+        self.with_params = with_params
+
+    def output(self, handler):
+        if self.with_params:
+            handler('{%with '); map(handler, self.with_params); handler('%}')
+
+        DjangoContainer.output(self, handler)
+
+        if self.with_params:
+            handler('{%endwith%}')
+
 
 class DjangoPreprocessedCallMacro(DjangoContainer):
     def init(self, children):
@@ -796,7 +822,7 @@ def _preprocess_includes(tree, context):
 
                 # Move tree from included file into {% include %}
                 block.__class__ = DjangoPreprocessedInclude
-                block.init([ include_tree ])
+                block.init([ include_tree ], block.with_params)
 
                 block.path = include_tree.path
                 block.line = include_tree.line
