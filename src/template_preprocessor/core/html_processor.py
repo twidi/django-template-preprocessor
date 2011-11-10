@@ -66,7 +66,7 @@ __HTML_ATTRIBUTES = {
     'select': ('name', 'value', 'size', ),
     'textarea': ('name', 'rows', 'cols', 'readonly', ),
     'link': ('type', 'rel', 'href', 'media', 'charset', ),
-    'meta': ('content', 'http-equiv', 'name', ),
+    'meta': ('content', 'http-equiv', 'name', 'charset', ),
     'script': ('type', 'src', 'language', 'charset', ),
     'style': ('type', 'media', ),
     'td': ('colspan', 'rowspan', ),
